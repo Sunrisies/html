@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        #drop-area {
+            width: 300px;
+            height: 200px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+        
+        #drop-area.highlight {
+            border-color: #2196F3;
+            background-color: rgba(33, 150, 243, 0.1);
+        }
+        
+        #file-list {
+            margin-top: 20px;
+            width: 300px;
+        }
+        
+        .file-item {
+            margin-bottom: 8px;
+            padding: 8px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <input type="text">
+    
+    <!-- 添加拖拽上传区域 -->
+    <div id="drop-area">
+        <p>拖拽文件到这里上传</p>
+        <p>或者</p>
+        <input type="file" id="file-input" multiple>
+    </div>
+    
+    <!-- 显示上传文件列表 -->
+    <div id="file-list"></div>
+    
+    <script>
+        // 通知权限请求
+        Notification.requestPermission().then((permission) => {
+            console.log(permission, 'permission') // permissio
+            if (permission === 'granted') {
+                new Notification('Hello World!',{
+                    body: '这是一条通知',
+                    vibrate:true
+                    // icon: 'URL_ADDRESS1.baidu.com/it/u=3706735391,3701574357&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500'
+                })
+            }
+        })
+        
+        // 拖拽上传功能
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+        const fileList = document.getElementById('file-list');
+        
+        // 阻止默认拖放行为
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        // 高亮显示拖放区域
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('highlight');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('highlight');
+        }
+        
+        // 处理拖放的文件
+        dropArea.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+        
+        // 处理通过文件输入选择的文件
+        fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+        
+        function handleFiles(files) {
+            if (files.length > 0) {
+                // 显示文件列表
+                showFiles(files);
+                   // 检测文件类型
+                   detectFileTypes(files);
+                // 这里可以添加上传文件的代码
+                // uploadFiles(files);
+                
+                // 显示通知
+                if (Notification.permission === 'granted') {
+                    new Notification('文件已添加', {
+                        body: `已添加 ${files.length} 个文件`,
+                        vibrate: true
+                    });
+                }
+            }
+        }
+        
+        function showFiles(files) {
+            fileList.innerHTML = '';
+            
+            Array.from(files).forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                const fileInfo = document.createElement('span');
+                fileInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
+                
+                // 添加文件类型信息
+                const fileType = document.createElement('span');
+                fileType.textContent = `类型: ${file.type || '未知'}`;
+                fileType.style.marginLeft = '10px';
+                fileType.style.color = '#666';
+                
+                fileItem.appendChild(fileInfo);
+                fileItem.appendChild(fileType);
+                fileList.appendChild(fileItem);
+            });
+        }
+        // 新增：检测文件类型的函数
+        function detectFileTypes(files) {
+            Array.from(files).forEach(file => {
+                console.log(`文件名: ${file.name}`);
+                console.log(`MIME类型: ${file.type}`);
+                
+                // 使用文件签名检测
+                if (file.type === '' || file.type === 'application/octet-stream') {
+                    readFileSignature(file);
+                }
+                
+                // 对于图片，可以获取更多信息
+                if (file.type.startsWith('image/')) {
+                    getImageInfo(file);
+                }
+            });
+        }
+        
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+           
+        // 读取文件签名（魔数）来判断文件类型
+        function readFileSignature(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arr = new Uint8Array(e.target.result);
+                let signature = '';
+                for (let i = 0; i < Math.min(arr.length, 4); i++) {
+                    signature += arr[i].toString(16).padStart(2, '0');
+                }
+                
+                // 根据文件签名判断类型
+                let detectedType = detectTypeBySignature(signature, file.name);
+                console.log(`文件签名: ${signature}`);
+                console.log(`检测到的类型: ${detectedType}`);
+                
+                // 更新UI显示检测到的类型
+                updateFileTypeInUI(file, detectedType);
+            };
+            
+            // 只读取文件的前几个字节
+            reader.readAsArrayBuffer(file.slice(0, 4));
+        }
+               
+        // 根据文件签名判断类型
+        function detectTypeBySignature(signature, fileName) {
+            // 常见文件类型的签名
+            const signatures = {
+                '89504e47': 'PNG图片',
+                'ffd8ffe0': 'JPEG图片',
+                'ffd8ffe1': 'JPEG图片',
+                '47494638': 'GIF图片',
+                '25504446': 'PDF文档',
+                '504b0304': 'ZIP压缩文件/Office文档',
+                '52617221': 'RAR压缩文件',
+                '7b5c7274': 'RTF文档',
+                '3c3f786d': 'XML文档',
+                '3c21444f': 'HTML文档',
+                '4d546864': 'MIDI音频',
+                '1a45dfa3': 'WebM视频',
+                '1f8b0800': 'GZIP压缩文件',
+                // 可以添加更多签名
+            };
+            console.log(signature, '-------signature')
+            return signatures[signature.toLowerCase()] || `未知类型 (${fileName.split('.').pop()})`;
+        }
+        // 获取图片的详细信息
+        function getImageInfo(file) {
+            const img = new Image();
+            img.onload = function() {
+                console.log(`图片尺寸: ${img.width} x ${img.height}`);
+                // 可以在UI中显示这些信息
+            };
+            
+            img.src = URL.createObjectURL(file);
+        }
+        
+        // 更新UI中的文件类型信息
+        function updateFileTypeInUI(file, detectedType) {
+            const fileItems = document.querySelectorAll('.file-item');
+            
+            for (let item of fileItems) {
+                if (item.textContent.includes(file.name)) {
+                    const typeSpan = item.querySelector('span:nth-child(2)');
+                    if (typeSpan) {
+                        typeSpan.textContent = `类型: ${detectedType}`;
+                        typeSpan.style.fontWeight = 'bold';
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // 上传文件的函数（示例）
+        function uploadFiles(files) {
+            // 这里是上传文件的代码，可以使用 XMLHttpRequest 或 Fetch API
+            // 例如：
+            /*
+            const formData = new FormData();
+            
+            Array.from(files).forEach(file => {
+                formData.append('file', file);
+            });
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('上传成功:', data);
+            })
+            .catch(error => {
+                console.error('上传失败:', error);
+            });
+            */
+            
+            console.log('准备上传文件:', files);
+        }
+    </script>
+</body>
+</html>

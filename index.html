@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <input type="text">
+    <script>
+        Notification.requestPermission().then((permission) => {
+            console.log(permission, 'permission') // permissio
+            if (permission === 'granted') {
+                new Notification('Hello World!',{
+                    body: '这是一条通知',
+                    vibrate:true
+                    // icon: 'URL_ADDRESS1.baidu.com/it/u=3706735391,3701574357&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500'
+                })
+            }
+        })
+    </script>
+</body>
+</html>

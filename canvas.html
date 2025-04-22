@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas时钟</title>
+    <style>
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="clock" width="300" height="300"></canvas>
+    <script>
+        // Canvas时钟实现
+        const canvas = document.getElementById('clock');
+        const ctx = canvas.getContext('2d');
+        const radius = canvas.width / 2 * 0.9;
+        
+        // 将坐标原点移到画布中心
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+       
+        // 绘制表盘
+        function drawFace() {
+            // 外圆
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            
+            // 外圆边框
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = radius * 0.04;
+            ctx.stroke();
+        }
+        
+        // 绘制时钟数字
+        function drawNumbers() {
+            ctx.font = radius * 0.15 + "px Arial";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+            
+            for (let num = 1; num <= 12; num++) {
+                const angle = num * Math.PI / 6;
+                const x = radius * 0.75 * Math.sin(angle);
+                const y = -radius * 0.75 * Math.cos(angle);
+                
+                ctx.fillText(num.toString(), x, y);
+            }
+            
+            // 绘制分钟刻度
+            for (let i = 0; i < 60; i++) {
+                const angle = i * Math.PI / 30;
+                const x1 = radius * 0.9 * Math.sin(angle);
+                const y1 = -radius * 0.9 * Math.cos(angle);
+                const x2 = radius * 0.95 * Math.sin(angle);
+                const y2 = -radius * 0.95 * Math.cos(angle);
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                
+                if (i % 5 === 0) {
+                    ctx.lineWidth = 3;
+                } else {
+                    ctx.lineWidth = 1;
+                }
+                
+                ctx.stroke();
+            }
+        }
+        
+        // 绘制指针
+        function drawHand(angle, length, width, color) {
+            ctx.beginPath();
+            ctx.lineWidth = width;
+            ctx.lineCap = "round";
+            ctx.strokeStyle = color;
+            
+            // 将角度转换为弧度
+            const radian = (angle - 90) * Math.PI / 180;
+            
+            // 绘制指针
+            ctx.moveTo(0, 0);
+            ctx.lineTo(length * Math.cos(radian), length * Math.sin(radian));
+            ctx.stroke();
+        }
+        
+        // 绘制中心圆点
+        function drawCenterDot() {
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.05, 0, 2 * Math.PI);
+            ctx.fillStyle = '#333';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.02, 0, 2 * Math.PI);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+        }
+      
+        
+        // 添加数字时间显示函数
+        function drawDigitalTime() {
+            const now = new Date();
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            const second = now.getSeconds();
+            
+            // 格式化时间，确保个位数前面有0
+            const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
+            
+            // 设置文本样式
+            ctx.font = radius * 0.15 + "px Arial";
+            ctx.fillStyle = "#333";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            // 在时钟下方绘制数字时间
+            ctx.fillText(timeString, 0, radius * 0.5);
+        }
+        
+        // 修改绘制时钟函数，添加数字时间显示
+        function drawClock() {
+            // 清除画布
+            ctx.clearRect(-canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+            
+            // 绘制表盘
+            drawFace();
+            
+            // 绘制刻度
+            drawNumbers();
+            
+            // 获取当前时间
+            const now = new Date();
+            const hour = now.getHours() % 12;
+            const minute = now.getMinutes();
+            const second = now.getSeconds();
+            
+            // 绘制时针
+            drawHand(hour * 30 + minute * 0.5, radius * 0.5, radius * 0.07, '#333');
+            
+            // 绘制分针
+            drawHand(minute * 6 + second * 0.1, radius * 0.7, radius * 0.05, '#666');
+            
+            // 绘制秒针
+            drawHand(second * 6, radius * 0.85, radius * 0.02, 'red');
+            
+            // 绘制中心圆点
+            drawCenterDot();
+            
+            // 绘制数字时间
+            drawDigitalTime();
+        }
+        
+        
+
+         // 帧率计算相关变量
+         let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 0;
+           // 添加帧率显示函数
+           function drawFPS() {
+            // 计算帧率
+            frameCount++;
+            const now = performance.now();
+            const delta = now - lastTime;
+            
+            // 每秒更新一次帧率计算
+            if (delta >= 1000) {
+                fps = Math.round((frameCount * 1000) / delta);
+                frameCount = 0;
+                lastTime = now;
+            }
+            
+            // 设置文本样式
+            ctx.font = radius * 0.1 + "px Arial";
+            ctx.fillStyle = "#666";
+            ctx.textAlign = "right";
+            ctx.textBaseline = "top";
+            
+            // 在右上角绘制帧率
+            ctx.fillText(`${fps} FPS`, canvas.width/2 - 10, -canvas.height/2 + 10);
+        }
+        function animate() {
+            drawClock();
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
