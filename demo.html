@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点击特效示例</title>
+</head>
+<body>
+    <!-- 引入特效脚本 -->
+    <script src="click-effects.js"></script>
+    <script>
+        // 初始化点击特效
+        new ClickEffects({
+            // 可选配置
+            colors: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4'], // 自定义颜色
+            particleCount: 12, // 粒子数量
+            rippleSize: 0.1 // 涟漪大小（相对于屏幕）
+        });
+    </script>
+</body>
+</html>
