@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跟随边框效果</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            cursor: none; /* 隐藏默认鼠标指针 */
+        }
+        
+        .border-container {
+            position: fixed;
+            pointer-events: none; /* 确保不会影响鼠标事件 */
+            transition: all 0.15s ease; /* 添加平滑过渡效果 */
+        }
+        
+        .corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+        }
+        
+        /* 左上角 */
+        .corner-1 {
+            top: 0;
+            left: 0;
+            border-right: none;
+            border-bottom: none;
+        }
+        
+        /* 右上角 */
+        .corner-2 {
+            top: 0;
+            right: 0;
+            border-left: none;
+            border-bottom: none;
+        }
+        
+        /* 左下角 */
+        .corner-3 {
+            bottom: 0;
+            left: 0;
+            border-right: none;
+            border-top: none;
+        }
+        
+        /* 右下角 */
+        .corner-4 {
+            bottom: 0;
+            right: 0;
+            border-left: none;
+            border-top: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="border-container">
+        <div class="corner corner-1"></div>
+        <div class="corner corner-2"></div>
+        <div class="corner corner-3"></div>
+        <div class="corner corner-4"></div>
+    </div>
+
+    <script>
+        const borderContainer = document.querySelector('.border-container');
+        const size = 100; // 边框的大小
+
+        // 更新边框位置的函数
+        function updateBorderPosition(e) {
+            const x = e.clientX - size / 2;
+            const y = e.clientY - size / 2;
+            
+            borderContainer.style.transform = `translate(${x}px, ${y}px)`;
+            borderContainer.style.width = `${size}px`;
+            borderContainer.style.height = `${size}px`;
+        }
+
+        // 添加鼠标移动事件监听
+        document.addEventListener('mousemove', updateBorderPosition);
+
+        // 添加一些动画效果
+        let isMoving = false;
+        let timeout;
+
+        document.addEventListener('mousemove', () => {
+            if (!isMoving) {
+                isMoving = true;
+                document.body.style.cursor = 'none';
+                borderContainer.style.opacity = '1';
+            }
+            
+            clearTimeout(timeout);
+            
+            timeout = setTimeout(() => {
+                isMoving = false;
+                borderContainer.style.opacity = '0.5';
+            }, 100);
+        });
+    </script>
+</body>
+</html>
