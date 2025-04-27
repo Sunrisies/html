@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript 代码压缩与编译工具</title>
+    <!-- 引入 Terser 库 -->
+    <script src="/bundle.min.js"></script>
+    <!-- 引入 Babel 库 -->
+    <script src="/babel.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #output {
+            background: #f8f8f8;
+        }
+        .options {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        .option-item {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JavaScript 代码压缩与编译工具</h1>
+        
+        <div class="input-group">
+            <h3>选择文件或直接输入代码：</h3>
+            <input type="file" id="fileInput" accept=".js">
+            <textarea id="codeInput" placeholder="在此输入 JavaScript 代码..."></textarea>
+        </div>
+
+        <div class="options">
+            <h3>编译选项：</h3>
+            <div class="option-item">
+                <input type="checkbox" id="useES5" checked>
+                <label for="useES5">编译为 ES5</label>
+            </div>
+            <div class="option-item">
+                <input type="checkbox" id="dropConsole" checked>
+                <label for="dropConsole">移除 console 语句</label>
+            </div>
+            <div class="option-item">
+                <input type="checkbox" id="dropDebugger" checked>
+                <label for="dropDebugger">移除 debugger 语句</label>
+            </div>
+            <div class="option-item">
+                <input type="checkbox" id="mangle" checked>
+                <label for="mangle">混淆变量名</label>
+            </div>
+            <div class="option-item">
+                <input type="checkbox" id="keepClassnames" checked>
+                <label for="keepClassnames">保留类名</label>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <button onclick="processCode()">压缩并编译代码</button>
+            <button onclick="downloadFile()">下载文件</button>
+        </div>
+
+        <div class="input-group">
+            <h3>处理后的代码：</h3>
+            <textarea id="output" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        // 文件读取处理
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('codeInput').value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // 代码处理函数
+        async function processCode() {
+            let code = document.getElementById('codeInput').value;
+            if (!code.trim()) {
+                alert('请输入或选择JavaScript代码！');
+                return;
+            }
+
+            try {
+                // 首先使用 Babel 编译代码
+                if (document.getElementById('useES5').checked) {
+                    code = Babel.transform(code, {
+                        presets: ['env'],
+                        plugins: ['transform-class-properties']
+                    }).code;
+                }
+
+                // 然后使用 Terser 压缩代码
+                const options = {
+                    compress: {
+                        drop_console: document.getElementById('dropConsole').checked,
+                        drop_debugger: document.getElementById('dropDebugger').checked
+                    },
+                    mangle: document.getElementById('mangle').checked ? {
+                        keep_classnames: document.getElementById('keepClassnames').checked
+                    } : false
+                };
+
+                const result = await Terser.minify(code, options);
+                document.getElementById('output').value = result.code;
+            } catch (error) {
+                alert('处理过程中出现错误：' + error.message);
+                console.error(error);
+            }
+        }
+
+        // 下载文件
+        function downloadFile() {
+            const code = document.getElementById('output').value;
+            if (!code.trim()) {
+                alert('请先生成处理后的代码！');
+                return;
+            }
+
+            const blob = new Blob([code], { type: 'text/javascript' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'compiled.min.js';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function obfuscateCode(code) {
+            // 创建随机变量名映射
+            const varMap = new Map();
+            
+            // 生成更复杂的随机变量名
+            function generateRandomStr() {
+                const hex = Math.random().toString(16).slice(2, 10);
+                return '_' + btoa(hex).replace(/[^a-zA-Z]/g, '');
+            }
+        
+            // 字符串编码
+            function encodeString(str) {
+                return str.split('').map(char => 
+                    '\\x' + char.charCodeAt(0).toString(16).padStart(2, '0')
+                ).join('');
+            }
+        
+            // CSS 样式混淆
+            code = code.replace(/\.([a-zA-Z-_]+)\s*{/g, (match, className) => {
+                const newName = generateRandomStr();
+                code = code.replace(new RegExp(`\\.${className}\\b`, 'g'), '.' + newName);
+                return '.' + newName + '{';
+            });
+        
+            // 数字编码
+            code = code.replace(/\b(\d+(\.\d+)?)\b/g, match => {
+                const num = parseFloat(match);
+                const operations = [
+                    n => `(${n}<<0)`,
+                    n => `(${Math.floor(n/2)}<<1${n%2?'+1':''})`,
+                    n => `(${n}^0)`,
+                    n => `([${n}]|0)`,
+                    n => `(${n}>>>0)`,
+                    n => `(${n}+[])`,
+                    n => `(${n}*1)`,
+                    n => `(${Math.floor(n)}|${n%1?`+${n%1}`:''})`,
+                    n => `(${n}|${~(~n)})`,
+                    n => `(${n}+0.1-0.1)`
+                ];
+                return operations[Math.floor(Math.random() * operations.length)](num);
+            });
+        
+            // 字符串混淆
+            code = code.replace(/"([^"\\]*)"/g, (match, str) => {
+                const encoded = encodeString(str);
+                return `(function(){var a="${encoded}";return a})()`;
+            });
+        
+            // 函数名混淆
+            code = code.replace(/function\s+([a-zA-Z_$][\w$]*)/g, (match, name) => {
+                if (!varMap.has(name)) {
+                    varMap.set(name, generateRandomStr());
+                }
+                return `function ${varMap.get(name)}`;
+            });
+        
+            // 添加干扰代码
+            const noise = [
+                'try{if(0)throw 0}catch(e){}',
+                '(function(){})()',
+                'void(""+1)',
+                '!function(){}()',
+                '(()=>{})()'
+            ];
+        
+            // 代码分段和重组
+            const parts = code.split(';');
+            const shuffled = parts.map(part => {
+                const noiseCode = noise[Math.floor(Math.random() * noise.length)];
+                return Math.random() > 0.5 ? `${part};${noiseCode}` : `${noiseCode};${part}`;
+            });
+        
+            // 添加代码保护
+            code = `
+                (function(){
+                    try{
+                        if(window.outerHeight-window.innerHeight>200)return;
+                        if(window.outerWidth-window.innerWidth>200)return;
+                        if(document.documentElement.clientWidth<700)return;
+                        ${shuffled.join(';')}
+                    }catch(e){}
+                })();
+            `.replace(/\s+/g, ' ').trim();
+        
+            return code;
+        }
+    </script>
+</body>
+</html>
