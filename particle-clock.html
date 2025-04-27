@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas 粒子时钟 (改进版)</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            background: #000;
+            display: block; /* 确保 canvas 占满空间 */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        class ParticleClock {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.particles = [];
+                this.targetPoints = []; // 存储目标点
+                this.colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#f9d423']; // 添加更多颜色
+                // this.numParticles = 1500; // 这个值现在是动态的，可以移除或注释掉
+                this.fontSize = 100; // 减小字体大小，比如从 150 减到 100
+                this.samplingStep = 4; // 可以稍微减小采样步长，让缩小后的字体更清晰
+                this.mouse = { x: null, y: null, radius: 80 }; // 也可以适当减小鼠标交互半径
+
+                // 添加用于跟踪时间变化的变量
+                this.lastHour = -1;
+                this.lastMinute = -1;
+                this.lastSecond = -1;
+
+                this.init();
+                this.animate();
+                window.addEventListener('mousemove', (e) => {
+                    this.mouse.x = e.clientX;
+                    this.mouse.y = e.clientY;
+                });
+                window.addEventListener('mouseout', () => {
+                    this.mouse.x = null;
+                    this.mouse.y = null;
+                });
+            }
+
+            init() {
+                // 先调整画布大小
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; // 背景绘制样式
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); // 初始绘制背景
+
+                // 清空粒子数组，等待 updateTimePoints 创建
+                this.particles = [];
+
+                // 首次获取时间点并创建/分配粒子
+                const now = new Date();
+                this.lastHour = now.getHours();
+                this.lastMinute = now.getMinutes();
+                this.lastSecond = now.getSeconds();
+                this.updateTimePoints(); // 调用一次以初始化
+
+                // 添加 resize 事件监听器
+                window.addEventListener('resize', () => this.resizeCanvas());
+            }
+
+            resizeCanvas() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                // 窗口变化时，只需要重新获取时间点，粒子数量和位置会在 updateTimePoints 中调整
+                this.updateTimePoints();
+            }
+
+
+            updateTimePoints() {
+                const now = new Date();
+                const timeString = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
+
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = this.canvas.width;
+                tempCanvas.height = this.canvas.height;
+
+                tempCtx.font = `bold ${this.fontSize}px Arial`;
+                tempCtx.fillStyle = 'white';
+                tempCtx.textAlign = 'center';
+                tempCtx.textBaseline = 'middle';
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                tempCtx.fillText(timeString, centerX, centerY);
+
+                // --- 估算 HH, MM, SS 的边界 ---
+                const textMetrics = tempCtx.measureText(timeString);
+                const totalWidth = textMetrics.width;
+                // 假设字符宽度大致相等，总共8个字符+2个冒号，大致分成3段
+                // 注意：这是一个粗略的估计，对于非等宽字体可能不精确
+                const approxCharWidth = totalWidth / 8.5; // 给冒号一点宽度
+                const hourEndX = centerX - totalWidth / 2 + approxCharWidth * 2.5; // HH:
+                const minuteEndX = hourEndX + approxCharWidth * 3; // MM:
+                // SS 部分从 minuteEndX 开始到文本结束
+
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                const pixels = imageData.data;
+
+                this.targetPoints = [];
+                for (let py = 0; py < tempCanvas.height; py += this.samplingStep) {
+                    for (let px = 0; px < tempCanvas.width; px += this.samplingStep) {
+                        const index = (py * tempCanvas.width + px) * 4;
+                        if (pixels[index + 3] > 128) {
+                            let part = 'second'; // 默认为秒
+                            if (px < hourEndX) {
+                                part = 'hour';
+                            } else if (px < minuteEndX) {
+                                part = 'minute';
+                            }
+                            this.targetPoints.push({
+                                x: px,
+                                y: py,
+                                color: this.colors[Math.floor(Math.random() * this.colors.length)],
+                                timePart: part // 记录这个点属于哪个部分
+                            });
+                        }
+                    }
+                }
+
+                const numTargetPoints = this.targetPoints.length;
+                const numCurrentParticles = this.particles.length;
+
+                // 1. 添加新粒子
+                if (numTargetPoints > numCurrentParticles) {
+                    for (let i = numCurrentParticles; i < numTargetPoints; i++) {
+                        const target = this.targetPoints[i];
+                        this.particles.push({
+                            x: target.x,
+                            y: target.y,
+                            originX: target.x,
+                            originY: target.y,
+                            size: Math.random() * 2 + 1,
+                            color: target.color,
+                            vx: 0,
+                            vy: 0,
+                            density: (Math.random() * 30) + 1,
+                            targetX: target.x,
+                            targetY: target.y,
+                            targetColor: target.color,
+                            timePart: target.timePart // **** 分配 timePart ****
+                        });
+                    }
+                }
+                // 2. 移除多余粒子
+                else if (numTargetPoints < numCurrentParticles) {
+                    this.particles.splice(numTargetPoints);
+                }
+
+                // 3. 分配新目标点和 timePart
+                for (let i = 0; i < numTargetPoints; i++) {
+                    if (!this.particles[i] || !this.targetPoints[i]) continue; // 添加安全检查
+
+                    this.particles[i].targetX = this.targetPoints[i].x;
+                    this.particles[i].targetY = this.targetPoints[i].y;
+                    this.particles[i].targetColor = this.targetPoints[i].color;
+                    this.particles[i].timePart = this.targetPoints[i].timePart; // **** 更新 timePart ****
+                }
+            }
+
+            updateParticles(currentHour, currentMinute, currentSecond) { // 接收当前时间
+                const easingY = 0.02; // 减小垂直方向的缓动系数，让运动更平滑
+                const easingX = 0.003; // 相应减小水平方向的缓动系数
+                const friction = 0.98; // 增大摩擦力系数，让运动更加平滑
+                const repulsionForce = 0.2; // 减小排斥力，让鼠标交互更柔和
+                
+                // 判断哪些时间单位发生了变化
+                const hourChanged = currentHour !== this.lastHour;
+                const minuteChanged = currentMinute !== this.lastMinute;
+                const secondChanged = currentSecond !== this.lastSecond;
+
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i];
+
+                    if (p.targetX === null || p.targetY === null) continue;
+
+                    let targetX = p.targetX;
+                    let targetY = p.targetY;
+
+                    let dx = targetX - p.x;
+                    let dy = targetY - p.y;
+
+                    let forceX = 0;
+                    let forceY = 0;
+
+                    // **** 条件移动逻辑 ****
+                    let applyEasing = false;
+                    if (p.timePart === 'second' && secondChanged) {
+                        applyEasing = true;
+                    } else if (p.timePart === 'minute' && minuteChanged) {
+                        applyEasing = true;
+                    } else if (p.timePart === 'hour' && hourChanged) {
+                        applyEasing = true;
+                    }
+
+                    if (applyEasing) {
+                        // 只有对应时间部分改变了，才施加主要的缓动力
+                        // 主要施加垂直力，水平力非常小
+                        forceX += dx * easingX; // 使用很小的水平缓动系数
+                        forceY += dy * easingY; // 使用正常的垂直缓动系数
+                    } else {
+                        // 如果时间部分没变，让粒子趋向于静止在目标点
+                        // 施加一个非常小的力维持位置
+                         forceX += dx * 0.001;
+                         forceY += dy * 0.001;
+                    }
+
+
+                    // 鼠标交互 - 对所有粒子都生效
+                    if (this.mouse.x !== null) {
+                        let mouseDx = p.x - this.mouse.x;
+                        let mouseDy = p.y - this.mouse.y;
+                        let mouseDistance = Math.sqrt(mouseDx * mouseDx + mouseDy * mouseDy);
+                        if (mouseDistance < this.mouse.radius) {
+                            const repelFactor = (this.mouse.radius - mouseDistance) / this.mouse.radius;
+                            // 注意：鼠标力会加到之前的力上
+                            forceX += (mouseDx / mouseDistance) * repulsionForce * repelFactor * p.density * 0.05;
+                            forceY += (mouseDy / mouseDistance) * repulsionForce * repelFactor * p.density * 0.05;
+                        }
+                    }
+
+                    // 更新速度 (加上合力，乘以摩擦力)
+                    // 摩擦力对所有粒子都生效
+                    p.vx = (p.vx + forceX) * friction;
+                    p.vy = (p.vy + forceY) * friction;
+
+                    // 更新位置
+                    p.x += p.vx;
+                    p.y += p.vy;
+                }
+            }
+
+            drawParticles() {
+                this.particles.forEach(p => {
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.fill();
+                });
+            }
+
+            animate() {
+                // 使用更透明的背景制造更长的拖尾效果
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'; // 从 0.15 改为 0.1
+                
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                const now = new Date();
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
+                const currentSecond = now.getSeconds();
+
+                // 只在秒数变化时更新目标点
+                if (currentSecond !== this.lastSecond) {
+                    // 只更新秒的部分
+                    this.updateTimePoints('second');
+                }
+                
+                // 在分钟变化时更新分钟部分
+                if (currentMinute !== this.lastMinute) {
+                    this.updateTimePoints('minute');
+                }
+                
+                // 在小时变化时更新小时部分
+                if (currentHour !== this.lastHour) {
+                    this.updateTimePoints('hour');
+                }
+
+                this.updateParticles(currentHour, currentMinute, currentSecond);
+                this.drawParticles();
+
+                // 更新记录的时间
+                this.lastHour = currentHour;
+                this.lastMinute = currentMinute;
+                this.lastSecond = currentSecond;
+
+                requestAnimationFrame(() => this.animate());
+            }
+
+            updateTimePoints(updatePart = 'all') {
+                const now = new Date();
+                const timeString = now.toTimeString().split(' ')[0];
+
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = this.canvas.width;
+                tempCanvas.height = this.canvas.height;
+
+                tempCtx.font = `bold ${this.fontSize}px Arial`;
+                tempCtx.fillStyle = 'white';
+                tempCtx.textAlign = 'center';
+                tempCtx.textBaseline = 'middle';
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                tempCtx.fillText(timeString, centerX, centerY);
+
+                // --- 估算 HH, MM, SS 的边界 ---
+                const textMetrics = tempCtx.measureText(timeString);
+                const totalWidth = textMetrics.width;
+                const approxCharWidth = totalWidth / 8.5;
+                const hourEndX = centerX - totalWidth / 2 + approxCharWidth * 2.5;
+                const minuteEndX = hourEndX + approxCharWidth * 3;
+
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                const pixels = imageData.data;
+
+                // 存储新的目标点
+                const newTargetPoints = [];
+                for (let py = 0; py < tempCanvas.height; py += this.samplingStep) {
+                    for (let px = 0; px < tempCanvas.width; px += this.samplingStep) {
+                        const index = (py * tempCanvas.width + px) * 4;
+                        if (pixels[index + 3] > 128) {
+                            let part = 'second';
+                            if (px < hourEndX) {
+                                part = 'hour';
+                            } else if (px < minuteEndX) {
+                                part = 'minute';
+                            }
+                            
+                            // 只添加需要更新的部分的点
+                            if (updatePart === 'all') {
+                                newTargetPoints.push({
+                                    x: px,
+                                    y: py,
+                                    color: this.colors[Math.floor(Math.random() * this.colors.length)],
+                                    timePart: part
+                                });
+                            } else if (part === updatePart) {
+                                // 只添加需要更新的部分
+                                newTargetPoints.push({
+                                    x: px,
+                                    y: py,
+                                    color: this.colors[Math.floor(Math.random() * this.colors.length)],
+                                    timePart: part
+                                });
+                            } else {
+                                // 对于不需要更新的部分，保持原有粒子的位置和颜色
+                                const existingParticle = this.particles.find(p => 
+                                    p.timePart === part && 
+                                    Math.abs(p.targetX - px) < this.samplingStep && 
+                                    Math.abs(p.targetY - py) < this.samplingStep
+                                );
+                                
+                                if (existingParticle) {
+                                    newTargetPoints.push({
+                                        x: px,
+                                        y: py,
+                                        color: existingParticle.color,
+                                        timePart: part
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (updatePart === 'all') {
+                    // 首次初始化时，创建所有粒子
+                    this.particles = newTargetPoints.map(target => ({
+                        x: target.x,
+                        y: target.y,
+                        originX: target.x,
+                        originY: target.y,
+                        size: Math.random() * 2 + 1,
+                        color: target.color,
+                        vx: 0,
+                        vy: 0,
+                        density: (Math.random() * 30) + 1,
+                        targetX: target.x,
+                        targetY: target.y,
+                        targetColor: target.color,
+                        timePart: target.timePart
+                    }));
+                } else {
+                    // 只更新指定部分的粒子
+                    this.particles = this.particles.filter(p => {
+                        // 保留不需要更新的部分的粒子
+                        if (p.timePart !== updatePart) {
+                            return true;
+                        }
+                        // 对于需要更新的部分，只保留有对应新目标点的粒子
+                        return newTargetPoints.some(t => 
+                            t.timePart === updatePart && 
+                            Math.abs(t.x - p.targetX) < this.samplingStep && 
+                            Math.abs(t.y - p.targetY) < this.samplingStep
+                        );
+                    });
+
+                    // 添加新的粒子
+                    const newParticles = newTargetPoints
+                        .filter(t => t.timePart === updatePart)
+                        .filter(t => !this.particles.some(p => 
+                            p.timePart === updatePart && 
+                            Math.abs(p.targetX - t.x) < this.samplingStep && 
+                            Math.abs(p.targetY - t.y) < this.samplingStep
+                        ))
+                        .map(target => ({
+                            x: target.x,
+                            y: target.y,
+                            originX: target.x,
+                            originY: target.y,
+                            size: Math.random() * 2 + 1,
+                            color: target.color,
+                            vx: 0,
+                            vy: 0,
+                            density: (Math.random() * 30) + 1,
+                            targetX: target.x,
+                            targetY: target.y,
+                            targetColor: target.color,
+                            timePart: target.timePart
+                        }));
+
+                    this.particles = [...this.particles, ...newParticles];
+                }
+            }
+        }
+
+        // 创建时钟实例
+        new ParticleClock();
+    </script>
+</body>
+</html>
