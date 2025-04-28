@@ -1,23 +1,230 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>PDF合并工具</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #42a5f5;
+            --secondary-color: #66bb6a;
+            --background-color: #fafafa;
+            --card-background: #ffffff;
+            --text-color: #212121;
+            --border-color: #eeeeee;
+            --hover-color: #f5f5f5;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            max-width: 1000px;
+            margin: 4rem auto;
+            padding: 0 3rem;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.7;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 3rem;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-group {
+            background: var(--card-background);
+            padding: 3rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2.5rem;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .input-group:hover {
+            transform: translateY(-6px) scale(1.01);
+        }
+
+        .custom-file-upload {
+            display: inline-flex;
+            align-items: center;
+            padding: 1.2rem 2.5rem;
+            background: linear-gradient(45deg, var(--primary-color), #1976d2);
+            color: white;
+            border-radius: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            gap: 1rem;
+            font-weight: 600;
+            box-shadow: 0 4px 8px rgba(66, 165, 245, 0.3);
+        }
+
+        .custom-file-upload:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(66, 165, 245, 0.4);
+        }
+
+        #pdfInput {
+            display: none;
+        }
+
+        button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 1.4rem;
+            background: linear-gradient(45deg, var(--secondary-color), #388e3c);
+            color: white;
+            border: none;
+            border-radius: 0.8rem;
+            cursor: pointer;
+            font-size: 1.25rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            gap: 1rem;
+            box-shadow: 0 4px 8px rgba(102, 187, 106, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(102, 187, 106, 0.4);
+        }
+
+        #fileList {
+            margin-top: 2.5rem;
+            background: var(--card-background);
+            border-radius: 0.8rem;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.03);
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-item:hover {
+            background-color: var(--hover-color);
+        }
+
+        .file-item button {
+            width: auto;
+            padding: 0.6rem 1.2rem;
+            background: #ef5350;
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(239, 83, 80, 0.2);
+        }
+
+        .file-item button:hover {
+            background: #e53935;
+            box-shadow: 0 3px 6px rgba(239, 83, 80, 0.3);
+        }
+
+        #downloadLink {
+            margin-top: 2.5rem;
+            display: none;
+            padding: 1.4rem;
+            background: linear-gradient(45deg, #5c6bc0, #3949ab);
+            color: white;
+            text-decoration: none;
+            border-radius: 0.8rem;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(92, 107, 192, 0.3);
+        }
+
+        #downloadLink:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(92, 107, 192, 0.4);
+        }
+
+        svg {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+    </style>
 </head>
+
 <body>
-    <input type="text">
+    <h1>PDF合并工具</h1>
+
+    <div class="input-group">
+        <label class="custom-file-upload" for="pdfInput">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            选择PDF文件
+        </label>
+        <input type="file" id="pdfInput" multiple accept="application/pdf">
+        <div id="fileList"></div>
+    </div>
+
+    <button onclick="mergePDFs()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        合并PDF文件
+    </button>
+    <a id="downloadLink">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 10v7a3 3 0 003 3h10a3 3 0 003-3v-7m-4-4l-4 4m0 0l-4-4m4 4V3" />
+        </svg>
+        下载合并后的PDF
+    </a>
+
     <script>
-        Notification.requestPermission().then((permission) => {
-            console.log(permission, 'permission') // permissio
-            if (permission === 'granted') {
-                new Notification('Hello World!',{
-                    body: '这是一条通知',
-                    vibrate:true
-                    // icon: 'URL_ADDRESS1.baidu.com/it/u=3706735391,3701574357&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500'
-                })
+        async function mergePDFs() {
+            const files = document.getElementById('pdfInput').files;
+            if (files.length < 2) {
+                alert('请选择至少2个PDF文件');
+                return;
             }
-        })
+
+            const mergedPdf = await PDFLib.PDFDocument.create();
+
+            for (const file of files) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                copiedPages.forEach(page => mergedPdf.addPage(page));
+            }
+
+            const mergedPdfBytes = await mergedPdf.save();
+            const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = URL.createObjectURL(blob);
+            downloadLink.download = 'merged.pdf';
+            downloadLink.style.display = 'block';
+        }
+        // 在文件选择后添加文件列表显示
+        document.getElementById('pdfInput').addEventListener('change', function (e) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = Array.from(e.target.files).map(file => `
+                <div class="file-item">
+                    <span>${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)</span>
+                    <button onclick="this.parentElement.remove()">×</button>
+                </div>
+            `).join('');
+        });
     </script>
 </body>
+
 </html>
