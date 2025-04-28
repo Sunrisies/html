@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>文件上传工具</title>
+    <style>
+        :root {
+            --primary-color: #42a5f5;
+            --secondary-color: #66bb6a;
+            --background-color: #fafafa;
+            --card-background: #ffffff;
+            --text-color: #212121;
+            --border-color: #eeeeee;
+            --hover-color: #f5f5f5;
+            --drag-hover-color: #e3f2fd;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            max-width: 1000px;
+            margin: 4rem auto;
+            padding: 0 3rem;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.7;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 3rem;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .upload-container {
+            background: var(--card-background);
+            padding: 3rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+        }
+
+        .drag-drop-area {
+            border: 2px dashed var(--primary-color);
+            border-radius: 0.8rem;
+            padding: 4rem 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .drag-drop-area:hover {
+            background-color: var(--drag-hover-color);
+        }
+
+        .drag-drop-area.dragover {
+            background-color: var(--drag-hover-color);
+            border-style: solid;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            width: 3rem;
+            height: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-button {
+            display: block;
+            width: 200px;
+            margin: 2rem auto 0;
+            padding: 1rem 2rem;
+            background: linear-gradient(45deg, var(--secondary-color), #388e3c);
+            color: white;
+            border: none;
+            border-radius: 0.8rem;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .upload-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 187, 106, 0.3);
+        }
+
+        .status-message {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+
+<body>
+    <h1>文件上传工具</h1>
+    
+    <div class="upload-container">
+        <div class="drag-drop-area" id="dragDropArea">
+            <input type="file" id="fileInput" style="position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer">
+            <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            <p>点击或拖拽文件到此处</p>
+        </div>
+        <p class="status-message" id="statusMessage"></p>
+    </div>
+
+    <script>
+        const dragDropArea = document.getElementById('dragDropArea');
+        const fileInput = document.getElementById('fileInput');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // 拖拽事件处理
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dragDropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        dragDropArea.addEventListener('dragover', highlight, false);
+        dragDropArea.addEventListener('dragleave', unhighlight, false);
+        dragDropArea.addEventListener('drop', handleDrop, false);
+
+        // 文件选择事件处理
+        fileInput.addEventListener('change', handleFileSelect, false);
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight(e) {
+            dragDropArea.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dragDropArea.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                statusMessage.textContent = `正在上传: ${files[0].name}`;
+                uploadFile(files[0]);
+            }
+        }
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const headers = new Headers({
+                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjQsInVzZXJuYW1lIjoiYWRtaW4iLCJpYXQiOjE3NDU2NTAzMTEsImV4cCI6MTc0NTY1MzkxMX0.9qLdfRW6ZdhQ3IBSPM1pUW7jY63mxrY7kSVvRBTdPYk',
+                'User-Agent': 'Apifox/1.0.0 (https://apifox.com)'
+            });
+
+            fetch('https://api.chaoyang1024.top:2345/api/upload/image', {
+                method: 'POST',
+                headers: headers,
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('上传失败');
+                return response.json();
+            })
+            .then(data => {
+                statusMessage.textContent = '上传成功!';
+                statusMessage.style.color = '#388e3c';
+            })
+            .catch(error => {
+                statusMessage.textContent = error.message;
+                statusMessage.style.color = '#ef5350';
+            });
+        }
+    </script>
+</body>
+</html>
