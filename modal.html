@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dialog 弹窗封装</title>
+    <style>
+        dialog {
+            padding: 24px;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+            min-width: 320px;
+            max-width: 90vw;
+            animation: dialogShow 0.3s ease-out;
+        }
+
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.4);
+            animation: backdropShow 0.3s ease-out;
+        }
+
+        @keyframes dialogShow {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes backdropShow {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .dialog-header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dialog-header h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #1a1a1a;
+        }
+
+        .dialog-close {
+            border: none;
+            background: none;
+            font-size: 20px;
+            color: #666;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .dialog-close:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .dialog-body {
+            margin-bottom: 24px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .dialog-btn {
+            padding: 8px 20px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .dialog-btn-primary {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .dialog-btn-primary:hover {
+            background-color: #1976D2;
+        }
+
+        .dialog-btn-secondary {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .dialog-btn-secondary:hover {
+            background-color: #e0e0e0;
+        }
+
+        .dialog-btn:focus {
+            outline: 2px solid #2196F3;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="Dialog.alert('这是一个提示消息')">显示提示弹窗</button>
+    <button onclick="Dialog.confirm('确定要删除这条记录吗？')">显示确认弹窗</button>
+
+    <script>
+        class Dialog {
+            static #template = {
+                alert: (message, options) => `
+                    <div class="dialog-header">
+                        <h3>${options.title || '提示'}</h3>
+                        <button class="dialog-close">&times;</button>
+                    </div>
+                    <div class="dialog-body">
+                        ${message}
+                    </div>
+                    <div class="dialog-footer">
+                        <button class="dialog-btn dialog-btn-primary" autofocus>${options.confirmText || '确定'}</button>
+                    </div>
+                `,
+                confirm: (message, options) => `
+                    <div class="dialog-header">
+                        <h3>${options.title || '确认'}</h3>
+                        <button class="dialog-close">&times;</button>
+                    </div>
+                    <div class="dialog-body">
+                        ${message}
+                    </div>
+                    <div class="dialog-footer">
+                        <button class="dialog-btn dialog-btn-secondary">${options.cancelText || '取消'}</button>
+                        <button class="dialog-btn dialog-btn-primary" autofocus>${options.confirmText || '确定'}</button>
+                    </div>
+                `
+            };
+
+            static #createDialog() {
+                const dialog = document.createElement('dialog');
+                // 控制点击弹窗外部关闭弹窗
+                // dialog.addEventListener('click', (e) => {
+                //     if (e.target === dialog) {
+                //         dialog.close();
+                //     }
+                // });
+                return dialog;
+            }
+
+            static #handleKeydown(dialog, resolve, defaultValue = false) {
+                dialog.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        dialog.close();
+                        resolve(defaultValue);
+                    }
+                });
+            }
+
+            static alert(message, options = {}) {
+                const dialog = this.#createDialog();
+                dialog.innerHTML = this.#template.alert(message, options);
+                document.body.appendChild(dialog);
+                dialog.showModal();
+
+                return new Promise(resolve => {
+                    this.#handleKeydown(dialog, resolve);
+
+                    const closeBtn = dialog.querySelector('.dialog-close');
+                    const confirmBtn = dialog.querySelector('.dialog-btn-primary');
+
+                    const close = () => {
+                        dialog.close();
+                        dialog.remove();
+                        resolve(true);
+                    };
+
+                    closeBtn.onclick = close;
+                    confirmBtn.onclick = close;
+                });
+            }
+
+            static confirm(message, options = {}) {
+                const dialog = this.#createDialog();
+                dialog.innerHTML = this.#template.confirm(message, options);
+                document.body.appendChild(dialog);
+                dialog.showModal();
+
+                return new Promise(resolve => {
+                    this.#handleKeydown(dialog, resolve, false);
+
+                    const closeBtn = dialog.querySelector('.dialog-close');
+                    const cancelBtn = dialog.querySelector('.dialog-btn-secondary');
+                    const confirmBtn = dialog.querySelector('.dialog-btn-primary');
+
+                    closeBtn.onclick = () => {
+                        dialog.close();
+                        dialog.remove();
+                        resolve(false);
+                    };
+
+                    cancelBtn.onclick = () => {
+                        dialog.close();
+                        dialog.remove();
+                        resolve(false);
+                    };
+
+                    confirmBtn.onclick = () => {
+                        dialog.close();
+                        dialog.remove();
+                        resolve(true);
+                    };
+                });
+            }
+        }
+
+        // 使用示例
+        async function showDialog() {
+            const result = await Dialog.confirm('确定要执行此操作吗？', {
+                title: '操作确认',
+                confirmText: '执行',
+                cancelText: '返回'
+            });
+
+            if (result) {
+                await Dialog.alert('操作执行成功！', {
+                    title: '成功'
+                });
+            }
+        }
+    </script>
+</body>
+</html>
