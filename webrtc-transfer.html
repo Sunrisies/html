@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 文件传输</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .connection-info {
+            flex: 1;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+
+        .chat-area {
+            flex: 2;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+
+        .message-list {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            background: #f5f5f5;
+        }
+
+        .message.sent {
+            background: #e3f2fd;
+            margin-left: 20%;
+        }
+
+        .message.received {
+            background: #f5f5f5;
+            margin-right: 20%;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        input, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        input {
+            flex: 1;
+        }
+
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #1976D2;
+        }
+
+        #fileInfo {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .progress-container {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #2196F3;
+            width: 0;
+            transition: width 0.3s ease;
+        }
+
+        .transfer-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebRTC 局域网传输</h1>
+    <div class="container">
+        <div class="connection-info">
+            <h2>连接信息</h2>
+            <div id="localId"></div>
+            <textarea id="remoteId" placeholder="输入对方ID"></textarea>
+            <button onclick="connect()">连接</button>
+            <div id="connectionStatus"></div>
+        </div>
+        
+        <div class="chat-area">
+            <div class="message-list" id="messageList"></div>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="输入消息">
+                <button onclick="sendMessage()">发送</button>
+                <input type="file" id="fileInput">
+                <button onclick="sendFile()">发送文件</button>
+            </div>
+            <div id="fileInfo"></div>
+            <!-- 添加进度条容器 -->
+            <div id="progressContainer" class="progress-container" style="display: none;">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div class="transfer-info">
+                    <span id="transferSpeed">0 KB/s</span>
+                    <span id="transferProgress">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script>
+        let peer = null;
+        let conn = null;
+        let chunks = [];
+
+        // 初始化 PeerJS
+        function initPeer() {
+            // 生成一个4位随机数字ID
+            const randomId = Math.floor(1000 + Math.random() * 9000);
+            peer = new Peer(randomId.toString(), {
+                debug: 2
+            });
+            
+            peer.on('open', (id) => {
+                document.getElementById('localId').textContent = `你的ID: ${id}`;
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+
+            peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                document.getElementById('connectionStatus').textContent = `错误: ${err.message}`;
+            });
+        }
+
+        // 连接到远程节点
+        function connect() {
+            const remoteId = document.getElementById('remoteId').value.trim();
+            if (!remoteId) {
+                alert('请输入对方ID');
+                return;
+            }
+
+            conn = peer.connect(remoteId);
+            setupConnection();
+        }
+
+        // 设置连接事件处理
+        function setupConnection() {
+            conn.on('open', () => {
+                document.getElementById('connectionStatus').textContent = '已连接';
+            });
+
+            conn.on('data', handleReceiveData);
+
+            conn.on('close', () => {
+                document.getElementById('connectionStatus').textContent = '连接已关闭';
+            });
+        }
+
+        // 发送消息
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const data = {
+                type: 'message',
+                content: message
+            };
+
+            conn.send(data);
+            appendMessage(message, true);
+            input.value = '';
+        }
+
+        // 发送文件
+        async function sendFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('请选择文件');
+                return;
+            }
+
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const transferSpeed = document.getElementById('transferSpeed');
+            const transferProgress = document.getElementById('transferProgress');
+            
+            progressContainer.style.display = 'block';
+            let startTime = Date.now();
+            let lastUpdate = startTime;
+            let bytesTransferred = 0;
+
+            // 发送文件信息
+            conn.send({
+                type: 'file-info',
+                name: file.name,
+                size: file.size
+            });
+
+            // 读取并发送文件数据
+            const chunkSize = 1131072; // 16KB chunks
+            const reader = new FileReader();
+            let offset = 0;
+
+            reader.onload = (e) => {
+                conn.send({
+                    type: 'file-data',
+                    data: e.target.result
+                });
+
+                // 更新进度和速度
+                bytesTransferred += e.target.result.byteLength;
+                const progress = (bytesTransferred / file.size) * 100;
+                progressFill.style.width = `${progress}%`;
+                transferProgress.textContent = `${Math.round(progress)}%`;
+
+                // 每500ms更新一次速度
+                const now = Date.now();
+                if (now - lastUpdate >= 500) {
+                    const duration = (now - startTime) / 1000; // 转换为秒
+                    const speed = bytesTransferred / duration; // 字节/秒
+                    transferSpeed.textContent = `${formatSize(speed)}/s`;
+                    lastUpdate = now;
+                }
+
+                offset += e.target.result.byteLength;
+                if (offset < file.size) {
+                    readNextChunk();
+                } else {
+                    conn.send({
+                        type: 'file-complete'
+                    });
+                    // 传输完成后隐藏进度条
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        progressFill.style.width = '0%';
+                    }, 1000);
+                }
+            };
+
+            function readNextChunk() {
+                const slice = file.slice(offset, offset + chunkSize);
+                reader.readAsArrayBuffer(slice);
+            }
+
+            readNextChunk();
+        }
+
+        // 处理接收到的数据
+        function handleReceiveData(data) {
+            if (data.type === 'message') {
+                appendMessage(data.content, false);
+            } else if (data.type === 'file-info') {
+                chunks = [];
+                const progressContainer = document.getElementById('progressContainer');
+                const progressFill = document.getElementById('progressFill');
+                const transferSpeed = document.getElementById('transferSpeed');
+                const transferProgress = document.getElementById('transferProgress');
+                
+                progressContainer.style.display = 'block';
+                progressFill.style.width = '0%';
+                
+                let startTime = Date.now();
+                let lastUpdate = startTime;
+                let bytesReceived = 0;
+                
+                document.getElementById('fileInfo').textContent = 
+                    `正在接收文件: ${data.name} (${formatSize(data.size)})`;
+            } else if (data.type === 'file-data') {
+                chunks.push(data.data);
+                
+                // 计算接收进度和速度
+                const totalReceived = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+                const progress = (totalReceived / data.size) * 100;
+                
+                const progressFill = document.getElementById('progressFill');
+                const transferProgress = document.getElementById('transferProgress');
+                const transferSpeed = document.getElementById('transferSpeed');
+                
+                progressFill.style.width = `${progress}%`;
+                transferProgress.textContent = `${Math.round(progress)}%`;
+                
+                const now = Date.now();
+                if (now - lastUpdate >= 500) {
+                    const duration = (now - startTime) / 1000;
+                    const speed = totalReceived / duration;
+                    transferSpeed.textContent = `${formatSize(speed)}/s`;
+                    lastUpdate = now;
+                }
+            } else if (data.type === 'file-complete') {
+                const blob = new Blob(chunks);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.name || 'downloaded-file';
+                a.click();
+                URL.revokeObjectURL(url);
+                chunks = [];
+                
+                // 传输完成后隐藏进度条
+                const progressContainer = document.getElementById('progressContainer');
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    document.getElementById('progressFill').style.width = '0%';
+                }, 1000);
+                
+                document.getElementById('fileInfo').textContent = '文件接收完成';
+            }
+        }
+
+        // 添加消息到列表
+        function appendMessage(message, isSent) {
+            const messageList = document.getElementById('messageList');
+            const div = document.createElement('div');
+            div.className = `message ${isSent ? 'sent' : 'received'}`;
+            div.textContent = message;
+            messageList.appendChild(div);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        // 格式化文件大小
+        function formatSize(bytes) {
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            if (bytes === 0) return '0 Byte';
+            const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+            return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+        }
+
+        // 初始化
+        initPeer();
+    </script>
+</body>
+</html>
