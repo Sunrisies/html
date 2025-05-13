@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浏览器指纹</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .fingerprint-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .item-title {
+            font-weight: bold;
+            color: #2196F3;
+            margin-bottom: 5px;
+        }
+
+        .item-value {
+            word-break: break-all;
+            color: #666;
+            font-family: monospace;
+        }
+
+        #fingerprintHash {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>浏览器指纹信息</h1>
+        <div id="fingerprintList"></div>
+        <div id="fingerprintHash"></div>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script>
+        // 收集浏览器指纹信息
+        async function collectFingerprint() {
+            const fingerprint = {
+                // 基本信息
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                platform: navigator.platform,
+                cookieEnabled: navigator.cookieEnabled,
+                doNotTrack: navigator.doNotTrack,
+                
+                // 屏幕信息
+                screenResolution: `${screen.width}x${screen.height}`,
+                colorDepth: screen.colorDepth,
+                pixelRatio: window.devicePixelRatio,
+                
+                // 时区信息
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timezoneOffset: new Date().getTimezoneOffset(),
+                
+                // 浏览器功能
+                touchSupport: 'ontouchstart' in window,
+                webglVendor: getWebGLInfo(),
+                canvas: getCanvasFingerprint(),
+                
+                // 插件信息
+                plugins: getPlugins(),
+                
+                // 字体信息
+                fonts: await getFonts(),
+                
+                // 硬件信息
+                hardwareConcurrency: navigator.hardwareConcurrency,
+                deviceMemory: navigator.deviceMemory,
+                
+                // 音频指纹
+                audioFingerprint: await getAudioFingerprint()
+            };
+
+            return fingerprint;
+        }
+
+        // 获取WebGL信息
+        function getWebGLInfo() {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) return 'WebGL not supported';
+            
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+                return {
+                    vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
+                    renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+                };
+            }
+            return 'WebGL vendor info not available';
+        }
+
+        // 获取Canvas指纹
+        function getCanvasFingerprint() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 需要设置Canvas的大小
+            canvas.width = 300;  // 添加这行
+            canvas.height = 150; // 添加这行
+            
+            console.log(canvas.width, canvas.height);
+            // 绘制一些图形和文字
+            ctx.textBaseline = 'top';
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#f60';
+            ctx.fillRect(125,1,62,20);
+            ctx.fillStyle = '#069';
+            ctx.fillText('Browser Fingerprint', 2, 15);
+            ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+            ctx.fillText('Canvas Test', 4, 17);
+            
+            return canvas.toDataURL();
+        }
+
+        // 获取插件信息
+        function getPlugins() {
+            const plugins = [];
+            for(let i = 0; i < navigator.plugins.length; i++) {
+                plugins.push(navigator.plugins[i].name);
+            }
+            return plugins;
+        }
+
+        // 获取字体列表
+        async function getFonts() {
+            if (!document.fonts || !document.fonts.check) {
+                return 'Font API not supported';
+            }
+
+            const baseFonts = [
+                'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana',
+                'Helvetica', 'Comic Sans MS', 'Tahoma', 'Impact'
+            ];
+
+            const availableFonts = [];
+            for (const font of baseFonts) {
+                if (await document.fonts.check(`12px "${font}"`)) {
+                    availableFonts.push(font);
+                }
+            }
+            return availableFonts;
+        }
+
+        // 获取音频指纹
+        async function getAudioFingerprint() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const analyser = audioContext.createAnalyser();
+                const gainNode = audioContext.createGain();
+                const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                gainNode.gain.value = 0; // 静音
+                oscillator.type = 'triangle'; // 三角波
+                oscillator.connect(analyser);
+                analyser.connect(scriptProcessor);
+                scriptProcessor.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.start(0);
+
+                return new Promise((resolve) => {
+                    scriptProcessor.onaudioprocess = (e) => {
+                        const inputData = e.inputBuffer.getChannelData(0);
+                        const sum = inputData.reduce((acc, val) => acc + Math.abs(val), 0);
+                        oscillator.stop();
+                        audioContext.close();
+                        resolve(sum.toString());
+                    };
+                });
+            } catch (e) {
+                return 'Audio API not supported';
+            }
+        }
+
+        // 生成指纹哈希
+        function generateHash(obj) {
+            const str = JSON.stringify(obj);
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return hash.toString(36);
+        }
+
+        // 显示指纹信息
+        function displayFingerprint(fingerprint) {
+            const container = document.getElementById('fingerprintList');
+            container.innerHTML = '';
+
+            for (const [key, value] of Object.entries(fingerprint)) {
+                const item = document.createElement('div');
+                item.className = 'fingerprint-item';
+                
+                const title = document.createElement('div');
+                title.className = 'item-title';
+                title.textContent = key;
+                
+                const valueDiv = document.createElement('div');
+                valueDiv.className = 'item-value';
+                valueDiv.textContent = typeof value === 'object' ? JSON.stringify(value) : value;
+                
+                item.appendChild(title);
+                item.appendChild(valueDiv);
+                container.appendChild(item);
+            }
+
+            // 显示哈希值
+            const hash = generateHash(fingerprint);
+            document.getElementById('fingerprintHash').textContent = `指纹哈希: ${hash}`;
+        }
+
+        // 初始化
+        async function init() {
+            const fingerprint = await collectFingerprint();
+            displayFingerprint(fingerprint);
+        }
+
+        init();
+    </script>
+</body>
+</html>
