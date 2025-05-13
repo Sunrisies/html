@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分形树动画</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        canvas {
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 设置canvas尺寸为全屏
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let angle = 0;
+        const branchFactor = 0.7; // 树枝长度缩放因子
+        const initialSize = 120; // 初始树干长度
+
+        function drawTree(x, y, size, angle, depth) {
+            if (size < 4 || depth > 12) return; // 限制递归深度
+
+            // 计算树枝终点
+            const endX = x + Math.cos(angle) * size;
+            const endY = y + Math.sin(angle) * size;
+
+            // 绘制树枝
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(endX, endY);
+            
+            // 根据深度设置颜色
+            const hue = (120 + depth * 10) % 360; // 从绿色开始变化
+            ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+            ctx.lineWidth = Math.max(1, depth / 2);
+            ctx.stroke();
+
+            // 递归绘制左右树枝
+            const newSize = size * branchFactor;
+            const angleOffset = Math.PI / 4 + Math.sin(angle + performance.now() / 1000) * 0.2;
+            
+            drawTree(endX, endY, newSize, angle - angleOffset, depth + 1);
+            drawTree(endX, endY, newSize, angle + angleOffset, depth + 1);
+        }
+
+        // 动画循环
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 从底部中心开始绘制树
+            const startX = canvas.width / 2;
+            const startY = canvas.height - 100;
+            
+            // 树干角度随时间变化
+            angle = -Math.PI / 2 + Math.sin(performance.now() / 2000) * 0.2;
+            
+            drawTree(startX, startY, initialSize, angle, 1);
+            requestAnimationFrame(animate);
+        }
+
+        // 添加鼠标交互
+        canvas.addEventListener('mousemove', (e) => {
+            // 根据鼠标位置调整初始角度
+            const dx = e.clientX - canvas.width / 2;
+            angle = -Math.PI / 2 + dx * 0.001;
+        });
+
+        animate();
+    </script>
+</body>
+</html>
