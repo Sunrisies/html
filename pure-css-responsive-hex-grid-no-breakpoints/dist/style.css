@@ -1,0 +1,83 @@
+/* RELEVANT CODE FOR THE HEX GRID */
+@property --w {
+	syntax: '<length>';
+	initial-value: 1px;
+	inherits: true
+}
+
+@property --u {
+	syntax: '<length>';
+	initial-value: 1px;
+	inherits: true
+}
+
+html, body, main, main a { display: grid }
+
+main {
+	--s: .5em;
+	--u: calc(5em*sqrt(3) + .5*var(--s));
+	container-type: inline-size;
+	grid-gap: calc(.5*var(--s)*sqrt(3)) var(--s);
+	grid-template-columns: repeat(auto-fit, minmax(calc(var(--u) - var(--s)), 1fr));
+	width: clamp(240px, 100%, 90em);
+	font: clamp(.5rem, 2vw, 1rem) sans-serif
+}
+
+main a {
+	--w: calc(100cqw + .5*var(--s));
+	--m: round(down, tan(atan2(var(--w), var(--u))));
+	--j: round(down, .5*var(--m));
+	--mod: mod(var(--i), var(--m) - 1);
+	--abs: abs(var(--j) - var(--mod));
+	--hov: 0;
+	grid-column: calc(2*(1 - min(1, var(--abs))));
+	grid-column-end: span 2;
+	margin: calc(-25%/sqrt(3)) 0;
+	clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+	
+	/* Chrome without flag :(( */
+	@supports not (scale: abs(-1)) {
+		--abs: max(var(--j) - var(--mod), var(--mod) - var(--j))
+	}
+}
+
+img {
+	width: 100%;
+	aspect-ratio: sqrt(3)/ 2;
+	object-fit: cover
+}
+
+/* JUST PRETTIFYING & LAYOUT */
+body {
+	overflow-x: hidden;
+	background: #121212;
+	color: #ededed;
+	font: clamp(.625em, 3vmin, 1.5em)/ 1.25 saira, sans-serif;
+	text-align: center
+}
+
+h1, b {
+	font-family: sour gummy;
+	text-wrap: balance
+}
+
+main {	
+	justify-self: center;
+	margin: calc(.5*var(--u)) 0;
+	filter: drop-shadow(2px 2px 5px #000)
+}
+
+a:is(:hover, :focus) { --hov: 1 }
+
+img {	
+	scale: calc(1 + var(--hov)*.25);
+	filter: saturate(var(--hov, 0));
+	transition: .65s ease-out
+}
+
+footer {
+	margin: 0 auto;
+	width: min(100%, 50em);
+	
+	a { color: gold }
+}
