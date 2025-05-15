@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,142 +11,216 @@
             padding: 0;
             overflow: hidden;
         }
+
         canvas {
             background: #000;
         }
     </style>
 </head>
+
 <body>
-    <canvas id="canvas"></canvas>
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        let mouseX = 0;
-        let mouseY = 0;
+        let w, h;
+        const canvas = document.createElement('canvas');
+        document.body.appendChild(canvas);
+        const ctx = canvas.getContext("2d");
+        const { sin, cos, PI, hypot, min, max } = Math;
 
-        // 设置canvas尺寸为全屏
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-
-        // 监听鼠标移动
-        canvas.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
-
-        // 蜘蛛网类
-        class SpiderWeb {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.targetX = x;
-                this.targetY = y;
-                this.lines = Math.floor(Math.random() * 5) + 6; // 6-10条线
-                this.maxRadius = Math.random() * 30 + 30; // 30-60的半径
-                this.points = [];
-                this.angleStep = (Math.PI * 2) / this.lines;
-                this.time = Math.random() * 1000; // 随机初始时间
-                this.speed = Math.random() * 0.02 + 0.01; // 随机速度
-                this.moveSpeed = 0.05;
-                
-                // 初始化端点
-                for (let i = 0; i < this.lines; i++) {
-                    this.points.push({
-                        angle: this.angleStep * i,
-                        radius: Math.random() * this.maxRadius,
-                        phase: Math.random() * Math.PI * 2 // 随机相位
-                    });
-                }
-            }
-
-            update() {
-                this.time += this.speed;
-                
-                // 检查鼠标距离
-                const dx = mouseX - this.x;
-                const dy = mouseY - this.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                // 如果鼠标靠近（200像素内），设置新的目标位置
-                if (distance < 200) {
-                    this.targetX = mouseX;
-                    this.targetY = mouseY;
-                } else {
-                    // 返回原始位置
-                    this.targetX = this.x;
-                    this.targetY = this.y;
-                }
-                
-                // 平滑移动
-                this.x += (this.targetX - this.x) * this.moveSpeed;
-                this.y += (this.targetY - this.y) * this.moveSpeed;
-
-                // 更新每条线的端点位置，加入随机波动
-                this.points.forEach(point => {
-                    point.radius = (Math.sin(this.time + point.phase) * 0.5 + 1) * this.maxRadius;
-                });
-            }
-
-            draw() {
-                ctx.beginPath();
-                ctx.strokeStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.2})`; // 随机透明度
-                ctx.lineWidth = Math.random() + 0.5; // 随机线宽
-                
-                // 绘制放射状线条
-                this.points.forEach(point => {
-                    const endX = this.x + Math.cos(point.angle) * point.radius;
-                    const endY = this.y + Math.sin(point.angle) * point.radius;
-                    ctx.moveTo(this.x, this.y);
-                    ctx.lineTo(endX, endY);
-                });
-
-                // 绘制连接线
-                for (let i = 0; i < this.points.length; i++) {
-                    const current = this.points[i];
-                    const next = this.points[(i + 1) % this.points.length];
-                    const x1 = this.x + Math.cos(current.angle) * current.radius;
-                    const y1 = this.y + Math.sin(current.angle) * current.radius;
-                    const x2 = this.x + Math.cos(next.angle) * next.radius;
-                    const y2 = this.y + Math.sin(next.angle) * next.radius;
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                }
-
-                ctx.stroke();
-                
-                // 绘制中心点
-                ctx.beginPath();
-                ctx.fillStyle = 'white';
-                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        // 创建多个蜘蛛网
-        const webs = [];
-        for (let i = 0; i < 10; i++) {
-            const x = Math.random() * canvas.width;
-            const y = Math.random() * canvas.height;
-            webs.push(new SpiderWeb(x, y));
-        }
-
-        // 动画循环
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            webs.forEach(web => {
-                web.update();
-                web.draw();
+        // 生成指定数量的随机点
+        // 在spawn函数中添加颜色渐变效果
+        function spawn() {
+            // 生成蜘蛛网点
+            const pts = many(333, () => {
+                return {
+                    x: rnd(innerWidth),
+                    y: rnd(innerHeight),
+                    len: 0,
+                    r: 0
+                };
             });
 
-            requestAnimationFrame(animate);
+            // 生成蜘蛛腿的锚点
+            const pts2 = many(9, (i) => {
+                return {
+                    x: cos((i / 9) * PI * 2),
+                    y: sin((i / 9) * PI * 2)
+                };
+            });
+
+            let seed = rnd(100);
+            let tx = rnd(innerWidth);
+            let ty = rnd(innerHeight);
+            let x = rnd(innerWidth);
+            let y = rnd(innerHeight);
+            let kx = rnd(0.5, 0.5);
+            let ky = rnd(0.5, 0.5);
+            let walkRadius = pt(rnd(50, 50), rnd(50, 50));
+            let r = innerWidth / rnd(100, 150);
+
+            // 绘制蜘蛛网的点和线
+            function paintPt(pt) {
+                // 添加线条渐变色
+                const gradient = ctx.createLinearGradient(x, y, pt.x, pt.y);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0.2)');
+                ctx.strokeStyle = gradient;
+                
+                pts2.forEach((pt2) => {
+                    if (!pt.len) return;
+                    drawLine(
+                        lerp(x + pt2.x * r, pt.x, pt.len * pt.len),
+                        lerp(y + pt2.y * r, pt.y, pt.len * pt.len),
+                        x + pt2.x * r,
+                        y + pt2.y * r
+                    );
+                });
+                drawCircle(pt.x, pt.y, pt.r);
+            }
+
+            return {
+                follow(x, y) {
+                    // 添加缓动效果
+                    const easing = 0.08;
+                    tx += (x - tx) * easing;
+                    ty += (y - ty) * easing;
+                },
+
+                tick(t) {
+                    // 计算蜘蛛的自主移动
+                    const selfMoveX = cos(t * kx + seed) * walkRadius.x;
+                    const selfMoveY = sin(t * ky + seed) * walkRadius.y;
+                    let fx = tx + selfMoveX;
+                    let fy = ty + selfMoveY;
+
+                    // 平滑移动
+                    x += min(innerWidth / 100, (fx - x) / 10);
+                    y += min(innerWidth / 100, (fy - y) / 10);
+
+                    // 更新所有点的状态
+                    let i = 0;
+                    pts.forEach((pt) => {
+                        const dx = pt.x - x,
+                            dy = pt.y - y;
+                        const len = hypot(dx, dy);
+                        let r = min(2, innerWidth / len / 5);
+                        pt.t = 0;
+                        const increasing = len < innerWidth / 10 && (i++) < 8;
+                        let dir = increasing ? 0.1 : -0.1;
+                        if (increasing) {
+                            r *= 1.5;
+                        }
+                        pt.r = r;
+                        pt.len = max(0, min(pt.len + dir, 1));
+                        paintPt(pt);
+                    });
+                }
+            };
         }
 
-        animate();
+        // 创建多个蜘蛛实例
+        const spiders = many(2, spawn);
+
+        // 鼠标移动事件处理
+        addEventListener("pointermove", (e) => {
+            spiders.forEach(spider => {
+                spider.follow(e.clientX, e.clientY);
+            });
+        });
+
+        // 添加触摸设备支持
+        addEventListener("touchmove", (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            spiders.forEach(spider => {
+                spider.follow(touch.clientX, touch.clientY);
+            });
+        }, { passive: false });
+        
+        // 添加蜘蛛数量控制
+        addEventListener("click", () => {
+            if (spiders.length < 5) {  // 限制最大蜘蛛数量
+                spiders.push(spawn());
+            }
+        });
+        
+        // 添加双击清除效果
+        addEventListener("dblclick", () => {
+            spiders.length = 1;  // 只保留一个蜘蛛
+        });
+        // 动画循环
+        requestAnimationFrame(function anim(t) {
+            // 添加自适应大小调整
+            function updateDimensions() {
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = innerWidth * dpr;
+                canvas.height = innerHeight * dpr;
+                canvas.style.width = innerWidth + 'px';
+                canvas.style.height = innerHeight + 'px';
+                ctx.scale(dpr, dpr);
+            }
+            
+            window.addEventListener('resize', updateDimensions);
+            updateDimensions();
+            if (w !== innerWidth) w = canvas.width = innerWidth;
+            if (h !== innerHeight) h = canvas.height = innerHeight;
+
+            // 清除画布并设置样式
+            ctx.fillStyle = "#000";
+            drawCircle(0, 0, w * 10);
+            ctx.fillStyle = ctx.strokeStyle = "#fff";
+
+            // 更新所有蜘蛛
+            t /= 1000;
+            spiders.forEach(spider => spider.tick(t));
+            requestAnimationFrame(anim);
+        });
+
+        // 工具函数
+        function rnd(x = 1, dx = 0) {
+            return Math.random() * x + dx;
+        }
+
+        function drawCircle(x, y, r) {
+            ctx.beginPath();
+            ctx.ellipse(x, y, r, r, 0, 0, PI * 2);
+            ctx.fill();
+        }
+
+        function drawLine(x0, y0, x1, y1) {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            
+            // 减少线段采样点数量，从100减少到50，可以提升性能
+            many(50, (i) => {
+                i = (i + 1) / 50;
+                let x = lerp(x0, x1, i);
+                let y = lerp(y0, y1, i);
+                let k = noise(x / 5 + x0, y / 5 + y0) * 2;
+                ctx.lineTo(x + k, y + k);
+            });
+            
+            ctx.stroke();
+        }
+
+        function many(n, f) {
+            return [...Array(n)].map((_, i) => f(i));
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function noise(x, y, t = 101) {
+            let w0 = sin(0.3 * x + 1.4 * t + 2.0 + 2.5 * sin(0.4 * y + -1.3 * t + 1.0));
+            let w1 = sin(0.2 * y + 1.5 * t + 2.8 + 2.3 * sin(0.5 * x + -1.2 * t + 0.5));
+            return w0 + w1;
+        }
+
+        function pt(x, y) {
+            return { x, y };
+        }
+
     </script>
 </body>
+
 </html>
