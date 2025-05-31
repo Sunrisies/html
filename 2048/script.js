@@ -76,9 +76,17 @@ document.addEventListener('DOMContentLoaded', () => {
             tile.dataset.row = row;
             tile.dataset.col = col;
             
+            // 计算方块位置
+            const tileSize = 100 / 4; // 每个方块占总宽度的25%
+            const gapSize = 15; // 间隙大小
+            const totalSize = this.tileContainer.clientWidth - gapSize * 3; // 总宽度减去间隙
+            const cellSize = totalSize / 4; // 单元格大小
+            
             // 设置方块位置
-            tile.style.top = `${row * 25 + row * 15 / 3}%`;
-            tile.style.left = `${col * 25 + col * 15 / 3}%`;
+            const top = row * (cellSize + gapSize);
+            const left = col * (cellSize + gapSize);
+            
+            tile.style.transform = `translate(${left}px, ${top}px)`;
             
             this.tileContainer.appendChild(tile);
         }

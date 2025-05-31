@@ -62,20 +62,25 @@ button:hover {
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 20px;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
 }
 
 .grid-container {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    grid-gap: 15px;
+    gap: 15px;
     position: relative;
     z-index: 1;
+    aspect-ratio: 1;
 }
 
 .grid-cell {
     background: rgba(238, 228, 218, 0.35);
-    aspect-ratio: 1;
     border-radius: 3px;
+    width: 100%;
+    aspect-ratio: 1;
 }
 
 .tile-container {
@@ -92,12 +97,13 @@ button:hover {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: calc(25% - 15px * 3/4);
-    height: calc(25% - 15px * 3/4);
+    width: calc((100% - 45px) / 4);
+    height: calc((100% - 45px) / 4);
     border-radius: 3px;
     font-size: 35px;
     font-weight: bold;
-    transition: all 0.15s ease;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    transform: translate(0, 0);
 }
 
 /* 数字方块的颜色 */
@@ -201,24 +207,102 @@ button:hover {
 @media (max-width: 520px) {
     .container {
         padding: 10px;
+        width: 100%;
     }
 
     h1 {
         font-size: 36px;
+        margin-bottom: 10px;
+    }
+
+    .game-container {
+        padding: 10px;
+    }
+
+    .grid-container {
+        gap: 10px;
+    }
+
+    .tile-container {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
     }
 
     .tile {
-        font-size: 28px;
+        font-size: 24px;
     }
 
     .tile-128,
     .tile-256,
     .tile-512 {
-        font-size: 24px;
+        font-size: 20px;
     }
 
     .tile-1024,
     .tile-2048 {
+        font-size: 16px;
+    }
+
+    .score-container {
+        padding: 8px 15px;
+        font-size: 16px;
+    }
+
+    button {
+        padding: 8px 15px;
+        font-size: 14px;
+    }
+
+    .instructions {
+        font-size: 14px;
+        margin-top: 15px;
+    }
+}
+
+@media (max-width: 350px) {
+    .tile {
         font-size: 20px;
     }
+
+    .tile-128,
+    .tile-256,
+    .tile-512,
+    .tile-1024,
+    .tile-2048 {
+        font-size: 14px;
+    }
+}
+
+/* 改进的动画效果 */
+@keyframes appear {
+    0% { 
+        opacity: 0;
+        transform: scale(0) translate(var(--x), var(--y));
+    }
+    100% { 
+        opacity: 1;
+        transform: scale(1) translate(var(--x), var(--y));
+    }
+}
+
+@keyframes pop {
+    0% { 
+        transform: scale(1) translate(var(--x), var(--y));
+    }
+    50% { 
+        transform: scale(1.1) translate(var(--x), var(--y));
+    }
+    100% { 
+        transform: scale(1) translate(var(--x), var(--y));
+    }
+}
+
+.tile-new {
+    animation: appear 0.2s ease;
+}
+
+.tile-merged {
+    animation: pop 0.2s ease;
 }
