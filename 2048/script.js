@@ -69,26 +69,57 @@ document.addEventListener('DOMContentLoaded', () => {
         addTile(row, col, value, isNew = false, isMerged = false) {
             const tile = document.createElement('div');
             tile.className = `tile tile-${value}`;
-            if (isNew) tile.classList.add('tile-new');
-            if (isMerged) tile.classList.add('tile-merged');
             
             tile.textContent = value;
             tile.dataset.row = row;
             tile.dataset.col = col;
             
             // 计算方块位置
-            const tileSize = 100 / 4; // 每个方块占总宽度的25%
-            const gapSize = 15; // 间隙大小
-            const totalSize = this.tileContainer.clientWidth - gapSize * 3; // 总宽度减去间隙
-            const cellSize = totalSize / 4; // 单元格大小
+            const gapSize = window.innerWidth <= 520 ? 10 : 15; // 响应式间隙
+            const position = this.calculatePosition(row, col, gapSize);
             
-            // 设置方块位置
-            const top = row * (cellSize + gapSize);
-            const left = col * (cellSize + gapSize);
+            // 设置CSS变量用于动画
+            tile.style.setProperty('--x', `${position.left}px`);
+            tile.style.setProperty('--y', `${position.top}px`);
+            tile.style.transform = `translate(${position.left}px, ${position.top}px)`;
             
-            tile.style.transform = `translate(${left}px, ${top}px)`;
+            // 添加动画类
+            if (isNew || isMerged) {
+                // 确保动画在DOM更新后应用
+                requestAnimationFrame(() => {
+                    if (isNew) tile.classList.add('tile-new');
+                    if (isMerged) tile.classList.add('tile-merged');
+                });
+            }
             
             this.tileContainer.appendChild(tile);
+        }
+
+        // 计算方块位置
+        calculatePosition(row, col, gapSize) {
+            const container = this.tileContainer.getBoundingClientRect();
+            const tileSize = (container.width - 3 * gapSize) / 4;
+            
+            return {
+                top: row * (tileSize + gapSize),
+                left: col * (tileSize + gapSize)
+            };
+        }
+
+        // 更新所有方块位置
+        updateTilePositions() {
+            const tiles = this.tileContainer.querySelectorAll('.tile');
+            const gapSize = window.innerWidth <= 520 ? 10 : 15;
+            
+            tiles.forEach(tile => {
+                const row = parseInt(tile.dataset.row);
+                const col = parseInt(tile.dataset.col);
+                const position = this.calculatePosition(row, col, gapSize);
+                
+                tile.style.setProperty('--x', `${position.left}px`);
+                tile.style.setProperty('--y', `${position.top}px`);
+                tile.style.transform = `translate(${position.left}px, ${position.top}px)`;
+            });
         }
         
         // 更新分数
