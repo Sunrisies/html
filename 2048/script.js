@@ -33,9 +33,18 @@ document.addEventListener('DOMContentLoaded', () => {
             this.tileContainer.innerHTML = '';
             this.messageContainer.classList.remove('game-over', 'game-won');
             
-            // 初始添加两个方块
-            this.addRandomTile();
-            this.addRandomTile();
+            // 确保游戏容器已经渲染并有正确的尺寸
+            requestAnimationFrame(() => {
+                // 等待下一帧以确保容器尺寸已计算
+                setTimeout(() => {
+                    // 初始添加两个方块
+                    this.addRandomTile();
+                    this.addRandomTile();
+                    
+                    // 更新方块位置
+                    this.updateTilePositions();
+                }, 100);
+            });
         }
         
         // 添加随机方块
@@ -66,9 +75,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // 添加方块到DOM
-        addTile(row, col, value, isNew = false, isMerged = false) {
+        addTile(row, col, value, isNew = false) {
             const tile = document.createElement('div');
             tile.className = `tile tile-${value}`;
+            if (isNew) tile.classList.add('tile-new');
             
             tile.textContent = value;
             tile.dataset.row = row;
@@ -78,19 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const gapSize = window.innerWidth <= 520 ? 10 : 15; // 响应式间隙
             const position = this.calculatePosition(row, col, gapSize);
             
-            // 设置CSS变量用于动画
-            tile.style.setProperty('--x', `${position.left}px`);
-            tile.style.setProperty('--y', `${position.top}px`);
-            tile.style.transform = `translate(${position.left}px, ${position.top}px)`;
-            
-            // 添加动画类
-            if (isNew || isMerged) {
-                // 确保动画在DOM更新后应用
-                requestAnimationFrame(() => {
-                    if (isNew) tile.classList.add('tile-new');
-                    if (isMerged) tile.classList.add('tile-merged');
-                });
-            }
+            // 直接设置到正确位置，不使用transform
+            tile.style.left = `${position.left}px`;
+            tile.style.top = `${position.top}px`;
             
             this.tileContainer.appendChild(tile);
         }
@@ -116,23 +116,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 const col = parseInt(tile.dataset.col);
                 const position = this.calculatePosition(row, col, gapSize);
                 
-                tile.style.setProperty('--x', `${position.left}px`);
-                tile.style.setProperty('--y', `${position.top}px`);
-                tile.style.transform = `translate(${position.left}px, ${position.top}px)`;
+                tile.style.left = `${position.left}px`;
+                tile.style.top = `${position.top}px`;
             });
         }
         
         // 更新分数
         updateScore() {
-            this.scoreElement.textContent = this.score;
+            if (this.scoreElement) {
+                this.scoreElement.textContent = this.score;
+            
+                // 添加分数更新动画效果
+                this.scoreElement.classList.remove('score-addition');
+                void this.scoreElement.offsetWidth; // 触发重排以重置动画
+                this.scoreElement.classList.add('score-addition');
+            } else {
+                console.error('Score element not found');
+            }
         }
         
         // 移动方块
         moveTiles(direction) {
             this.moved = false;
-            
-            // 根据移动方向决定遍历顺序
             const traversals = this.buildTraversals(direction);
+            const movedTiles = new Set(); // 记录已移动的方块
             
             // 遍历所有单元格
             traversals.row.forEach(row => {
@@ -151,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             this.cells[next.row][next.col] = mergedValue;
                             this.cells[row][col] = null;
                             
-                            // 标记为已合并，防止一次移动中多次合并
+                            // 标记为已合并
                             next.merged = true;
                             
                             // 更新分数
@@ -164,11 +171,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                 this.showMessage('你赢了!', 'game-won');
                             }
                             
+                            movedTiles.add(`${next.row},${next.col}`);
                             this.moved = true;
                         } else if (positions.farthest.row !== row || positions.farthest.col !== col) {
                             // 移动到最远位置
                             this.cells[positions.farthest.row][positions.farthest.col] = tile;
                             this.cells[row][col] = null;
+                            movedTiles.add(`${positions.farthest.row},${positions.farthest.col}`);
                             this.moved = true;
                         }
                     }
@@ -177,30 +186,29 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 如果有移动，更新界面并添加新方块
             if (this.moved) {
-                // 清除所有方块
+                // 清空所有方块
                 this.tileContainer.innerHTML = '';
                 
-                // 重新渲染所有方块
+                // 重新创建所有方块
                 for (let row = 0; row < this.gridSize; row++) {
                     for (let col = 0; col < this.gridSize; col++) {
                         const value = this.cells[row][col];
                         if (value) {
-                            this.addTile(row, col, value);
+                            this.addTile(row, col, value, false);
                         }
                     }
                 }
                 
-                // 清除合并标记
-                for (let row = 0; row < this.gridSize; row++) {
-                    for (let col = 0; col < this.gridSize; col++) {
-                        if (this.cells[row][col]) {
-                            delete this.cells[row][col].merged;
-                        }
-                    }
-                }
-                
-                // 添加新方块
+                // 清除合并标记并添加新方块
                 setTimeout(() => {
+                    for (let row = 0; row < this.gridSize; row++) {
+                        for (let col = 0; col < this.gridSize; col++) {
+                            if (this.cells[row][col]) {
+                                delete this.cells[row][col].merged;
+                            }
+                        }
+                    }
+                    
                     this.addRandomTile();
                     
                     // 检查游戏是否结束
@@ -359,6 +367,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 this.moveTiles(direction);
+            });
+
+            // 窗口大小变化时重新计算方块位置
+            window.addEventListener('resize', () => {
+                this.updateTilePositions();
             });
             
             // 触摸控制

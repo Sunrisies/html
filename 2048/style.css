@@ -39,6 +39,24 @@ h1 {
     border-radius: 6px;
     color: white;
     font-size: 18px;
+    position: relative;
+}
+
+#score {
+    display: inline-block;
+    margin-left: 5px;
+    font-weight: bold;
+    color: #f9f6f2;
+}
+
+.score-addition {
+    animation: score-pop 0.5s ease-in-out;
+}
+
+@keyframes score-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
 }
 
 button {
@@ -61,10 +79,12 @@ button:hover {
     background: #bbada0;
     padding: 15px;
     border-radius: 6px;
-    margin-bottom: 20px;
     width: 100%;
     max-width: 500px;
-    margin: 0 auto;
+    margin: 0 auto 20px;
+    touch-action: none; /* 防止触摸设备上的默认行为 */
+    user-select: none; /* 防止文本选择 */
+    -webkit-touch-callout: none; /* 防止iOS上的长按菜单 */
 }
 
 .grid-container {
@@ -74,6 +94,9 @@ button:hover {
     position: relative;
     z-index: 1;
     aspect-ratio: 1;
+    background: #bbada0;
+    border-radius: 6px;
+    padding: 0;
 }
 
 .grid-cell {
@@ -81,6 +104,7 @@ button:hover {
     border-radius: 3px;
     width: 100%;
     aspect-ratio: 1;
+    transition: background-color 0.15s ease;
 }
 
 .tile-container {
@@ -90,6 +114,7 @@ button:hover {
     right: 15px;
     bottom: 15px;
     z-index: 2;
+    pointer-events: none; /* 允许点击穿透到底层 */
 }
 
 .tile {
@@ -102,8 +127,23 @@ button:hover {
     border-radius: 3px;
     font-size: 35px;
     font-weight: bold;
-    transition: transform 0.15s ease, opacity 0.15s ease;
-    transform: translate(0, 0);
+    transition: left 0.15s ease-in-out, top 0.15s ease-in-out;
+    backface-visibility: hidden; /* 防止Safari上的闪烁 */
+    -webkit-font-smoothing: antialiased;
+}
+
+/* 优化移动端触摸体验 */
+@media (hover: hover) {
+    .tile {
+        cursor: default;
+    }
+}
+
+/* 优化高DPI屏幕显示 */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .tile {
+        -webkit-font-smoothing: subpixel-antialiased;
+    }
 }
 
 /* 数字方块的颜色 */
@@ -275,34 +315,18 @@ button:hover {
     }
 }
 
-/* 改进的动画效果 */
+/* 简化的动画效果 */
 @keyframes appear {
     0% { 
         opacity: 0;
-        transform: scale(0) translate(var(--x), var(--y));
+        transform: scale(0);
     }
     100% { 
         opacity: 1;
-        transform: scale(1) translate(var(--x), var(--y));
-    }
-}
-
-@keyframes pop {
-    0% { 
-        transform: scale(1) translate(var(--x), var(--y));
-    }
-    50% { 
-        transform: scale(1.1) translate(var(--x), var(--y));
-    }
-    100% { 
-        transform: scale(1) translate(var(--x), var(--y));
+        transform: scale(1);
     }
 }
 
 .tile-new {
     animation: appear 0.2s ease;
-}
-
-.tile-merged {
-    animation: pop 0.2s ease;
 }
