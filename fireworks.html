@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>烟花特效</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        canvas {
+            display: block;
+        }
+        .info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="fireworks"></canvas>
+    <div class="info">点击屏幕发射烟花</div>
+    <script>
+        // 获取Canvas元素
+        const canvas = document.getElementById('fireworks');
+        const ctx = canvas.getContext('2d');
+
+        // 设置Canvas为全屏
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // 烟花和粒子数组
+        const fireworks = [];
+        const particles = [];
+
+        // 重力常量
+        const gravity = 0.2;
+        
+        // 颜色数组
+        const colors = [
+            '#FF5252', '#FF4081', '#E040FB', '#7C4DFF', 
+            '#536DFE', '#448AFF', '#40C4FF', '#18FFFF', 
+            '#64FFDA', '#69F0AE', '#B2FF59', '#EEFF41', 
+            '#FFFF00', '#FFD740', '#FFAB40', '#FF6E40'
+        ];
+
+        // 烟花类
+        class Firework {
+            constructor(x, y, targetX, targetY) {
+                this.x = x;
+                this.y = y;
+                this.startX = x;
+                this.startY = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.distanceToTarget = this.calculateDistance(x, y, targetX, targetY);
+                this.distanceTraveled = 0;
+                this.coordinates = [];
+                this.coordinateCount = 3;
+                
+                // 存储坐标历史用于拖尾效果
+                while(this.coordinateCount--) {
+                    this.coordinates.push([this.x, this.y]);
+                }
+                
+                this.angle = Math.atan2(targetY - y, targetX - x);
+                this.speed = 2;
+                this.acceleration = 1.05;
+                this.brightness = Math.random() * 50 + 50;
+                this.targetRadius = 1;
+                this.trail = [];
+            }
+            
+            // 计算两点之间的距离
+            calculateDistance(x1, y1, x2, y2) {
+                const xDistance = x2 - x1;
+                const yDistance = y2 - y1;
+                return Math.sqrt(Math.pow(xDistance, 2) + Math.pow(yDistance, 2));
+            }
+            
+            // 更新烟花位置
+            update() {
+                // 移除最老的坐标
+                this.coordinates.pop();
+                // 添加当前坐标到开头
+                this.coordinates.unshift([this.x, this.y]);
+                
+                // 目标圆圈动画
+                if(this.targetRadius < 8) {
+                    this.targetRadius += 0.3;
+                } else {
+                    this.targetRadius = 1;
+                }
+                
+                // 加速烟花
+                this.speed *= this.acceleration;
+                
+                // 计算当前速度的x和y分量
+                const vx = Math.cos(this.angle) * this.speed;
+                const vy = Math.sin(this.angle) * this.speed;
+                
+                // 计算已经行进的距离
+                this.distanceTraveled = this.calculateDistance(
+                    this.startX, this.startY, this.x + vx, this.y + vy
+                );
+                
+                // 如果已经到达目标，创建爆炸效果
+                if(this.distanceTraveled >= this.distanceToTarget) {
+                    createParticles(this.targetX, this.targetY);
+                    return true; // 标记为删除
+                } else {
+                    // 继续移动
+                    this.x += vx;
+                    this.y += vy;
+                    return false;
+                }
+            }
+            
+            // 绘制烟花
+            draw() {
+                ctx.beginPath();
+                // 移动到最后记录的坐标
+                ctx.moveTo(
+                    this.coordinates[this.coordinates.length - 1][0],
+                    this.coordinates[this.coordinates.length - 1][1]
+                );
+                // 画线到当前坐标
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = `hsl(${Math.random() * 360}, 100%, ${this.brightness}%)`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // 绘制目标圆圈
+                ctx.beginPath();
+                ctx.arc(this.targetX, this.targetY, this.targetRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${1 - this.targetRadius / 8})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // 粒子类
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.coordinates = [];
+                this.coordinateCount = 5;
+                
+                // 存储坐标历史用于拖尾效果
+                while(this.coordinateCount--) {
+                    this.coordinates.push([this.x, this.y]);
+                }
+                
+                // 设置随机角度和速度
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 10 + 2;
+                
+                // 摩擦力，使粒子减速
+                this.friction = 0.95;
+                // 重力，使粒子下落
+                this.gravity = gravity;
+                
+                // 随机颜色
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 设置亮度和衰减速度
+                this.brightness = Math.random() * 50 + 50;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.015;
+            }
+            
+            // 更新粒子位置
+            update() {
+                // 移除最老的坐标
+                this.coordinates.pop();
+                // 添加当前坐标到开头
+                this.coordinates.unshift([this.x, this.y]);
+                
+                // 减速
+                this.speed *= this.friction;
+                
+                // 应用重力
+                this.y += this.gravity;
+                
+                // 更新位置
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                
+                // 淡出粒子
+                this.alpha -= this.decay;
+                
+                // 如果粒子淡出，标记为删除
+                return this.alpha <= 0;
+            }
+            
+            // 绘制粒子
+            draw() {
+                ctx.beginPath();
+                // 移动到最后记录的坐标
+                ctx.moveTo(
+                    this.coordinates[this.coordinates.length - 1][0],
+                    this.coordinates[this.coordinates.length - 1][1]
+                );
+                // 画线到当前坐标
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = `rgba(${this.color}, ${this.alpha})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        // 创建粒子爆炸
+        function createParticles(x, y) {
+            // 创建多个粒子
+            const particleCount = 100;
+            for(let i = 0; i < particleCount; i++) {
+                particles.push(new Particle(x, y));
+            }
+        }
+
+        // 随机发射烟花
+        function launchRandomFirework() {
+            const startX = Math.random() * canvas.width * 0.25 + canvas.width * 0.375;
+            const startY = canvas.height;
+            const targetX = Math.random() * canvas.width * 0.5 + canvas.width * 0.25;
+            const targetY = Math.random() * canvas.height * 0.5;
+            
+            fireworks.push(new Firework(startX, startY, targetX, targetY));
+        }
+
+        // 点击发射烟花
+        canvas.addEventListener('click', (e) => {
+            const startX = Math.random() * canvas.width * 0.25 + canvas.width * 0.375;
+            const startY = canvas.height;
+            fireworks.push(new Firework(startX, startY, e.clientX, e.clientY));
+        });
+
+        // 动画循环
+        function animate() {
+            // 请求下一帧
+            requestAnimationFrame(animate);
+            
+            // 设置半透明背景，形成拖尾效果
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 更新和绘制烟花
+            for(let i = fireworks.length - 1; i >= 0; i--) {
+                const shouldRemove = fireworks[i].update();
+                fireworks[i].draw();
+                
+                // 如果烟花到达目标，移除它
+                if(shouldRemove) {
+                    fireworks.splice(i, 1);
+                }
+            }
+            
+            // 更新和绘制粒子
+            for(let i = particles.length - 1; i >= 0; i--) {
+                const shouldRemove = particles[i].update();
+                particles[i].draw();
+                
+                // 如果粒子消失，移除它
+                if(shouldRemove) {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            // 随机发射烟花
+            if(Math.random() < 0.05 && fireworks.length < 5) {
+                launchRandomFirework();
+            }
+        }
+
+        // 开始动画
+        animate();
+    </script>
+</body>
+</html>
