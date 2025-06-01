@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Digital Rain</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix"></canvas>
+    <script>
+        // 获取canvas元素
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+
+        // 设置canvas为全屏
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // 字符集
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%^&*()';
+        
+        // 字符大小
+        const fontSize = 16;
+        
+        // 计算列数
+        const columns = Math.floor(canvas.width / fontSize);
+        
+        // 每列的当前y坐标
+        const drops = new Array(columns).fill(1);
+        
+        // 绘制函数
+        function draw() {
+            // 设置半透明的黑色背景，形成拖尾效果
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 设置文字颜色和样式
+            ctx.fillStyle = '#0F0'; // 经典的绿色
+            ctx.font = fontSize + 'px monospace';
+            
+            // 循环绘制每一列
+            for(let i = 0; i < drops.length; i++) {
+                // 随机选择一个字符
+                const char = chars[Math.floor(Math.random() * chars.length)];
+                
+                // 计算x坐标
+                const x = i * fontSize;
+                // 计算y坐标
+                const y = drops[i] * fontSize;
+                
+                // 绘制字符
+                ctx.fillStyle = `rgba(0, 255, 0, ${Math.random() * 0.5 + 0.5})`; // 随机透明度
+                ctx.fillText(char, x, y);
+                
+                // 随机添加发光效果
+                if(Math.random() > 0.975) {
+                    ctx.fillStyle = '#FFF';
+                    ctx.fillText(char, x, y);
+                }
+                
+                // 当字符到达底部或随机触发时，重置到顶部
+                if(y > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                
+                // 更新y坐标
+                drops[i]++;
+            }
+        }
+
+        // 创建渐变效果的字符
+        function createGradientChar(x, y, char) {
+            const gradient = ctx.createLinearGradient(x, y - fontSize, x, y);
+            gradient.addColorStop(0, 'rgba(0, 255, 0, 0)');
+            gradient.addColorStop(0.5, 'rgba(0, 255, 0, 1)');
+            gradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
+            return gradient;
+        }
+
+        // 添加一些随机初始位置
+        for(let i = 0; i < drops.length; i++) {
+            drops[i] = Math.floor(Math.random() * canvas.height / fontSize);
+        }
+
+        // 动画循环
+        function animate() {
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        // 开始动画
+        animate();
+
+        // 添加鼠标交互效果
+        canvas.addEventListener('mousemove', (e) => {
+            const x = Math.floor(e.clientX / fontSize);
+            if(x >= 0 && x < drops.length) {
+                // 在鼠标位置创建新的下落效果
+                drops[x] = 0;
+                if(x > 0) drops[x-1] = 0;
+                if(x < drops.length - 1) drops[x+1] = 0;
+            }
+        });
+
+        // 添加点击效果
+        canvas.addEventListener('click', () => {
+            // 随机重置一些列
+            for(let i = 0; i < drops.length; i++) {
+                if(Math.random() > 0.5) {
+                    drops[i] = 0;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
