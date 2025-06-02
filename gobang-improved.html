@@ -27,9 +27,16 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
+        .canvas-container {
+            border: 2px solid #8b4513;
+            border-radius: 4px;
+            padding: 2px;
+        }
+
         canvas {
             background-color: #e4bb7d;
             cursor: pointer;
+            display: block;
         }
 
         .controls {
@@ -55,29 +62,91 @@
             margin: 20px 0;
             font-size: 18px;
             color: #333;
+            text-align: center;
+        }
+
+        dialog {
+            padding: 20px;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            background-color: #fff;
+        }
+
+        dialog::backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .dialog-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 300px;
+        }
+
+        .dialog-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .dialog-message {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .dialog-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4a4a4a;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .dialog-button:hover {
+            background-color: #333;
         }
     </style>
 </head>
 <body>
     <div class="game-container">
-        <canvas id="gobang"></canvas>
+        <div class="canvas-container">
+            <canvas id="gobang"></canvas>
+        </div>
         <div class="status" id="status">黑方回合</div>
         <div class="controls">
             <button id="restart">重新开始</button>
         </div>
     </div>
 
+    <dialog id="winDialog">
+        <div class="dialog-content">
+            <h2 class="dialog-title">游戏结束</h2>
+            <p class="dialog-message" id="dialogMessage"></p>
+            <button class="dialog-button" id="dialogRestartBtn">重新开始</button>
+        </div>
+    </dialog>
+
     <script>
         const canvas = document.getElementById('gobang');
         const ctx = canvas.getContext('2d');
         const status = document.getElementById('status');
         const restartBtn = document.getElementById('restart');
+        const winDialog = document.getElementById('winDialog');
+        const dialogMessage = document.getElementById('dialogMessage');
+        const dialogRestartBtn = document.getElementById('dialogRestartBtn');
 
         // 游戏配置
         const GRID_SIZE = 15; // 15x15的棋盘
-        const CELL_SIZE = 30; // 每个格子的大小
-        const PIECE_RADIUS = 13; // 棋子半径
-        const BOARD_MARGIN = 20; // 棋盘边距
+        const CELL_SIZE = 35; // 每个格子的大小
+        const PIECE_RADIUS = 15; // 棋子半径
+        const BOARD_MARGIN = 30; // 棋盘边距
+        const LINE_WIDTH = 1; // 线条宽度
 
         // 计算画布大小
         const CANVAS_SIZE = GRID_SIZE * CELL_SIZE + BOARD_MARGIN * 2;
@@ -94,10 +163,14 @@
             // 清空画布
             ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
+            // 绘制棋盘背景
+            ctx.fillStyle = '#e4bb7d';
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
             // 绘制网格线
             ctx.beginPath();
             ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = LINE_WIDTH;
 
             // 绘制横线
             for (let i = 0; i < GRID_SIZE; i++) {
@@ -113,10 +186,10 @@
 
             ctx.stroke();
 
-            // 绘制中心点和天元点
+            // 绘制天元和星位
             const points = [
-                [7, 7],  // 中心点
-                [3, 3], [3, 11], [11, 3], [11, 11]  // 天元点
+                [7, 7],  // 天元
+                [3, 3], [3, 11], [11, 3], [11, 11]  // 星位
             ];
 
             points.forEach(([x, y]) => {
@@ -135,17 +208,36 @@
 
         // 绘制棋子
         function drawPiece(x, y, color) {
+            const centerX = BOARD_MARGIN + x * CELL_SIZE;
+            const centerY = BOARD_MARGIN + y * CELL_SIZE;
+
+            // 绘制阴影
             ctx.beginPath();
-            ctx.arc(
-                BOARD_MARGIN + x * CELL_SIZE,
-                BOARD_MARGIN + y * CELL_SIZE,
-                PIECE_RADIUS,
-                0,
-                Math.PI * 2
-            );
-            ctx.fillStyle = color;
+            ctx.arc(centerX + 2, centerY + 2, PIECE_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.fill();
-            ctx.strokeStyle = '#000';
+
+            // 绘制棋子
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, PIECE_RADIUS, 0, Math.PI * 2);
+            
+            // 创建渐变
+            const gradient = ctx.createRadialGradient(
+                centerX - 3, centerY - 3, 1,
+                centerX, centerY, PIECE_RADIUS
+            );
+
+            if (color === 'black') {
+                gradient.addColorStop(0, '#666');
+                gradient.addColorStop(1, '#000');
+            } else {
+                gradient.addColorStop(0, '#fff');
+                gradient.addColorStop(1, '#ddd');
+            }
+
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.strokeStyle = color === 'black' ? '#000' : '#ccc';
             ctx.lineWidth = 1;
             ctx.stroke();
         }
@@ -227,8 +319,11 @@
 
             // 检查是否获胜
             if (checkWin(row, col)) {
-                status.textContent = `${currentPlayer === 'black' ? '黑' : '白'}方获胜！`;
+                const winner = currentPlayer === 'black' ? '黑' : '白';
+                dialogMessage.textContent = `${winner}方获胜！`;
+                status.textContent = `${winner}方获胜！`;
                 gameOver = true;
+                winDialog.showModal();
                 return;
             }
 
@@ -243,16 +338,17 @@
             currentPlayer = 'black';
             gameOver = false;
             status.textContent = '黑方回合';
+            winDialog.close();
             redraw();
         }
 
         // 添加事件监听
         canvas.addEventListener('click', handleClick);
         restartBtn.addEventListener('click', restart);
+        dialogRestartBtn.addEventListener('click', restart);
 
         // 初始化游戏
         redraw();
     </script>
-    
 </body>
 </html>
