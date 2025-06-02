@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单音频可视化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            color: #333333;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #e0e0e0;
+        }
+
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+        }
+
+        #audioPlayer {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .info {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .file-label:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>音频可视化</h1>
+        
+        <div class="controls">
+            <label class="file-label" for="audioFile">
+                选择音频文件
+            </label>
+            <input type="file" id="audioFile" accept="audio/*">
+            
+            <select id="visualType">
+                <option value="bars">频谱图</option>
+                <option value="wave">波形图</option>
+            </select>
+            
+            <button id="micButton">使用麦克风</button>
+        </div>
+
+        <canvas id="visualizer"></canvas>
+        
+        <audio id="audioPlayer" controls></audio>
+        
+        <div id="info" class="info">
+            请选择音频文件或使用麦克风
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const audioFile = document.getElementById('audioFile');
+        const micButton = document.getElementById('micButton');
+        const visualType = document.getElementById('visualType');
+        const info = document.getElementById('info');
+
+        let audioContext;
+        let analyser;
+        let source;
+        let animationId;
+        let dataArray;
+        let bufferLength;
+
+        // 设置canvas尺寸
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+
+        // 初始化音频分析器
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+        }
+
+        // 处理音频文件
+        function handleAudioFile(file) {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                audioPlayer.src = URL.createObjectURL(file);
+                info.textContent = `正在播放: ${file.name}`;
+
+                initAudio();
+                source = audioContext.createMediaElementSource(audioPlayer);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+
+                visualize();
+                audioPlayer.play();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 处理麦克风输入
+        async function handleMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+
+                audioPlayer.style.display = 'none';
+                info.textContent = '使用麦克风输入';
+
+                initAudio();
+                source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                visualize();
+            } catch (err) {
+                info.textContent = '无法访问麦克风: ' + err.message;
+            }
+        }
+
+        // 绘制频谱图
+        function drawBars() {
+            analyser.getByteFrequencyData(dataArray);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const barWidth = (canvas.width / bufferLength) * 2.5;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (dataArray[i] / 255) * canvas.height;
+
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+                x += barWidth + 1;
+                if (x > canvas.width) break;
+            }
+        }
+
+        // 绘制波形图
+        function drawWave() {
+            analyser.getByteTimeDomainData(dataArray);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#333333';
+            ctx.beginPath();
+
+            const sliceWidth = canvas.width / bufferLength;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = v * canvas.height / 2;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+
+                x += sliceWidth;
+            }
+
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+        }
+
+        // 可视化
+        function visualize() {
+            if (!analyser) return;
+
+            function draw() {
+                animationId = requestAnimationFrame(draw);
+
+                if (visualType.value === 'bars') {
+                    drawBars();
+                } else {
+                    drawWave();
+                }
+            }
+
+            draw();
+        }
+
+        // 事件监听
+        window.addEventListener('resize', resizeCanvas);
+        
+        audioFile.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleAudioFile(file);
+            }
+        });
+
+        micButton.addEventListener('click', handleMicrophone);
+        
+        visualType.addEventListener('change', function() {
+            if (analyser) {
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+                visualize();
+            }
+        });
+
+        // 初始化
+        resizeCanvas();
+
+        // 检查浏览器支持
+        if (!window.AudioContext && !window.webkitAudioContext) {
+            info.textContent = '您的浏览器不支持Web Audio API，请使用现代浏览器。';
+        }
+    </script>
+</body>
+</html>
